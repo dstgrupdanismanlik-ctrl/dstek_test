@@ -1,5 +1,4 @@
 import 'package:go_router/go_router.dart';
-import '../../screens/academic_study_room_screen.dart';
 import '../../core/init/app_initializer.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart'; // Yeni ekran eklendi
@@ -23,10 +22,6 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/home',
       builder: (context, state) => const HomeScreen(),
-    ),
-    GoRoute(
-      path: '/academic-study-room',
-      builder: (context, state) => const AcademicStudyRoomScreen(),
     ),
   ],
 );

@@ -25,16 +25,11 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       try {
+        // İsimli parametreler (email: ve password:) eklendi
         await context.read<AuthProvider>().signIn(
               email: _emailController.text.trim(),
               password: _passwordController.text.trim(),
             );
-            
-        // EKSİK OLAN HAYATİ SATIR BURASI: Giriş başarılıysa ana sayfaya geç!
-        if (mounted) {
-          context.go('/'); // Eğer GoRouter ana sayfa rotan '/home' ise burayı '/home' olarak değiştir.
-        }
-        
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
