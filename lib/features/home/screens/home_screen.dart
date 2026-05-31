@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../shared/widgets/expandable_card.dart';
 import '../../profile/screens/profile_screen.dart';
@@ -88,7 +89,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            _buildDrawerItem(icon: Icons.calendar_month, title: 'Çalışma Programım', onTap: () { setState(() { _customBody = null; }); }),
+            _buildDrawerItem(icon: Icons.calendar_month, title: 'Çalışma Programım', onTap: () {
+              Navigator.pop(context);
+              context.go('/study-program');
+            }),
             _buildDrawerItem(icon: Icons.task_alt, title: 'Sorumluluklar ve Ödevler', onTap: () { setState(() { _customBody = null; }); }),
             
             // YENİDEN DÜZENLENEN TEST VE SINAV MERKEZİ MENÜSÜ
