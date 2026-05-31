@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../shared/widgets/expandable_card.dart';
+import '../../../shared/widgets/app_drawer.dart';
 import '../../profile/screens/profile_screen.dart';
 import '../../../core/services/setup_service.dart';
-import '../../exams/screens/exam_entry_screen.dart'; // Yeni ekranı import ettik
+import '../../exams/screens/exam_entry_screen.dart';
 import '../../../screens/academic_study_room_screen.dart';
 import '../../../screens/guidance_counseling_screen.dart';
 import '../../../screens/inventory_system_screen.dart';
@@ -73,117 +73,41 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: Colors.blueAccent),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Icon(Icons.school, size: 48, color: Colors.white),
-                  SizedBox(height: 8),
-                  Text('Öğrenci Paneli', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-            _buildDrawerItem(icon: Icons.calendar_month, title: 'Çalışma Programım', onTap: () {
-              Navigator.pop(context);
-              context.go('/study-program');
-            }),
-            _buildDrawerItem(icon: Icons.task_alt, title: 'Sorumluluklar ve Ödevler', onTap: () { setState(() { _customBody = null; }); }),
-            
-            // YENİDEN DÜZENLENEN TEST VE SINAV MERKEZİ MENÜSÜ
-            ExpansionTile(
-              leading: const Icon(Icons.edit_document, color: Colors.blueAccent),
-              title: const Text('Test ve Sınav Merkezi', style: TextStyle(fontSize: 16)),
-              initiallyExpanded: true,
-              children: [
-                ListTile(
-                  contentPadding: const EdgeInsets.only(left: 56.0),
-                  title: const Text('Test girişleri alanı', style: TextStyle(fontSize: 14)),
-                  onTap: () {
-                    setState(() {
-                      _selectedExamMode = 0; // Test modu
-                      _selectedIndex = 2; // Sınavlar sekmesini aç
-                      _customBody = null;
-                    });
-                    Navigator.pop(context); // Menüyü kapat
-                  },
-                ),
-                ListTile(
-                  contentPadding: const EdgeInsets.only(left: 56.0),
-                  title: const Text('Deneme girişleri alanı', style: TextStyle(fontSize: 14)),
-                  onTap: () {
-                    setState(() {
-                      _selectedExamMode = 1; // Deneme modu
-                      _selectedIndex = 2; // Sınavlar sekmesini aç
-                      _customBody = null;
-                    });
-                    Navigator.pop(context); // Menüyü kapat
-                  },
-                ),
-                // Akademik Çalışma Odası (taşındı, artık buradan kaldırıldı)
-              ],
-            ),
-            
-            // Old 'Akademik Çalışma Odası' draft removed (was an ExpansionTile)
-
-            // Akademik Çalışma Odası (ana menü öğesi)
-            ListTile(
-              leading: const Icon(Icons.play_lesson, color: Colors.blueAccent),
-              title: const Text('Akademik Çalışma Odası', style: TextStyle(fontSize: 16)),
-              onTap: () {
-                setState(() {
-                  _customBody = const AcademicStudyRoomScreen();
-                });
-                Navigator.pop(context);
-              },
-            ),
-            ExpansionTile(
-              leading: const Icon(Icons.analytics, color: Colors.blueAccent),
-              title: const Text('Detaylı Analiz ve Röntgen', style: TextStyle(fontSize: 16)),
-              children: [
-                ListTile(contentPadding: const EdgeInsets.only(left: 56.0), title: const Text('Zaman Bazlı Özetler', style: TextStyle(fontSize: 14)), onTap: () {}),
-                ListTile(contentPadding: const EdgeInsets.only(left: 56.0), title: const Text('Sınav Röntgenleri', style: TextStyle(fontSize: 14)), onTap: () {}),
-              ],
-            ),
-            ListTile(
-              leading: const Icon(Icons.explore, color: Colors.blueAccent),
-              title: const Text('Rehberlik ve Yönlendirme', style: TextStyle(fontSize: 16)),
-              onTap: () {
-                setState(() {
-                  _customBody = GuidanceCounselingScreen();
-                });
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.psychology, color: Colors.blueAccent),
-              title: const Text('Envanter Sistemi', style: TextStyle(fontSize: 16)),
-              onTap: () {
-                setState(() {
-                  _customBody = InventorySystemScreen();
-                });
-                Navigator.pop(context);
-              },
-            ),
-            const Divider(),
-            ExpansionTile(
-              leading: const Icon(Icons.settings, color: Colors.blueAccent),
-              title: const Text('Ayarlar', style: TextStyle(fontSize: 16)),
-              children: [
-                ListTile(contentPadding: const EdgeInsets.only(left: 56.0), title: const Text('Şifre Değiştirme', style: TextStyle(fontSize: 14)), onTap: () {}),
-              ],
-            ),
-            _buildDrawerItem(icon: Icons.exit_to_app, title: 'Çıkış Yap', onTap: () async {
-              await context.read<AuthProvider>().signOut();
-            }),
-            const SizedBox(height: 24),
-          ],
-        ),
+      drawer: AppDrawer(
+        onExamTestTap: () {
+          setState(() {
+            _selectedExamMode = 0;
+            _selectedIndex = 2;
+            _customBody = null;
+          });
+        },
+        onExamPracticeTap: () {
+          setState(() {
+            _selectedExamMode = 1;
+            _selectedIndex = 2;
+            _customBody = null;
+          });
+        },
+        onStudyRoomTap: () {
+          setState(() {
+            _customBody = const AcademicStudyRoomScreen();
+          });
+        },
+        onGuidanceTap: () {
+          setState(() {
+            _customBody = GuidanceCounselingScreen();
+          });
+        },
+        onInventoryTap: () {
+          setState(() {
+            _customBody = InventorySystemScreen();
+          });
+        },
+        onTasksTap: () {
+          setState(() {
+            _customBody = null;
+          });
+        },
       ),
       body: bodyWidget,
       bottomNavigationBar: BottomNavigationBar(

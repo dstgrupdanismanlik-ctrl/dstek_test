@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../shared/widgets/app_drawer.dart';
 
 // --- 1. Veri Modeli ---
 class SubjectItem {
@@ -29,6 +30,10 @@ class StudyProgramScreen extends StatefulWidget {
 class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  // Scrollbar'lar için controller'lar (Scrollbar + ScrollView aynı controller'ı paylaşmalı)
+  final ScrollController _kanbanScrollController = ScrollController();
+  final ScrollController _weeklyScrollController = ScrollController();
+
   // 1. Bölüm: State Listeleri (5 Sütun)
   List<SubjectItem> excellentSubjects = []; 
   List<SubjectItem> goodSubjects = [];      
@@ -55,6 +60,8 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
   @override
   void dispose() {
     _tabController.dispose();
+    _kanbanScrollController.dispose();
+    _weeklyScrollController.dispose();
     super.dispose();
   }
 
@@ -186,7 +193,9 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
           flex: 6,
           child: Scrollbar(
             thumbVisibility: true,
+            controller: _kanbanScrollController,
             child: SingleChildScrollView(
+              controller: _kanbanScrollController,
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.all(16.0),
               child: Row(
@@ -280,7 +289,9 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
         padding: const EdgeInsets.all(8.0),
         child: Scrollbar(
           thumbVisibility: true,
+          controller: _weeklyScrollController,
           child: SingleChildScrollView(
+            controller: _weeklyScrollController,
             scrollDirection: Axis.horizontal,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -463,6 +474,7 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text("Çalışma Programım"),
         centerTitle: true,
