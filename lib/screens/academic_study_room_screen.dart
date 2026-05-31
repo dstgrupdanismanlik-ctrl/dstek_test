@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../shared/widgets/app_drawer.dart';
 
 class AcademicStudyRoomScreen extends StatefulWidget {
   const AcademicStudyRoomScreen({Key? key}) : super(key: key);
@@ -15,7 +16,7 @@ class _AcademicStudyRoomScreenState extends State<AcademicStudyRoomScreen> {
   String? selectedKaynak;
 
   // Sisteme giriş yapan öğrencinin sınav türü (Firestore bağlanınca profilden gelecek)
-  final String studentExamType = "YKS"; 
+  final String studentExamType = "YKS";
 
   // 2. Sahte (Mock) Veritabanı (Firestore'a geçince bu veriler dinamik çekilecek)
   final Map<String, List<String>> dersler = {
@@ -35,7 +36,7 @@ class _AcademicStudyRoomScreenState extends State<AcademicStudyRoomScreen> {
   final List<String> araclar = [
     "Videolar",
     "Konu Anlatım Dosyaları (PDF)",
-    "Soru Bankası"
+    "Soru Bankası",
   ];
 
   final Map<String, List<String>> kaynaklar = {
@@ -77,7 +78,6 @@ class _AcademicStudyRoomScreenState extends State<AcademicStudyRoomScreen> {
 
   // 4. Kaynağa Git Aksiyonu
   void _kaynagaGit() {
-    // Burada URL yönlendirme (url_launcher vb.) işlemleri yapılacak.
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('$selectedKaynak kaynağına yönlendiriliyorsunuz...'),
@@ -88,171 +88,180 @@ class _AcademicStudyRoomScreenState extends State<AcademicStudyRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Öğrencinin sınav türüne göre ders listesini çek
     final currentDersler = dersler[studentExamType] ?? [];
-    // Seçilen derse göre konu listesini çek
     final currentKonular = selectedDers != null ? konular[selectedDers!] ?? [] : [];
-    // Seçilen araca göre kaynak listesini çek
     final currentKaynaklar = selectedArac != null ? kaynaklar[selectedArac!] ?? [] : [];
 
-    // Return only the inner content so this widget can be embedded inside the main Scaffold's body.
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600), // Web/Tablet uyumluluğu için genişlik sınırı
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    "Akademik Materyal Seçimi",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "Çalışmak istediğiniz konuya ait dijital materyallere ulaşmak için aşağıdaki seçimleri yapınız.",
-                    style: TextStyle(color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-
-                  // --- 1. DERS SEÇİMİ ---
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: "Ders Seçiniz",
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.book),
+    return Scaffold(
+      // --- Adım 2: AppDrawer eklendi, context.go('/academic-study-room') ile yönlendiriliyor ---
+      drawer: const AppDrawer(),
+      // --- Adım 3: automaticallyImplyLeading: false → geri oku kapalı, hamburger menü açık ---
+      appBar: AppBar(
+        title: const Text("Akademik Çalışma Odası"),
+        centerTitle: true,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      "Akademik Materyal Seçimi",
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
                     ),
-                    initialValue: selectedDers,
-                    items: currentDersler.map((ders) {
-                      return DropdownMenuItem<String>(
-                        value: ders,
-                        child: Text(ders),
-                      );
-                    }).toList(),
-                    onChanged: _onDersChanged,
-                  ),
-                  const SizedBox(height: 20),
-
-                  // --- 2. KONU SEÇİMİ ---
-                  DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      labelText: selectedDers == null ? "Önce Ders Seçiniz" : "Konu Seçiniz",
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.format_list_bulleted),
-                      filled: selectedDers == null,
-                      fillColor: Colors.grey.shade200,
+                    const SizedBox(height: 8),
+                    const Text(
+                      "Çalışmak istediğiniz konuya ait dijital materyallere ulaşmak için aşağıdaki seçimleri yapınız.",
+                      style: TextStyle(color: Colors.grey),
+                      textAlign: TextAlign.center,
                     ),
-                    initialValue: selectedKonu,
-                    items: currentKonular.map((konu) {
-                      return DropdownMenuItem<String>(
-                        value: konu,
-                        child: Text(konu),
-                      );
-                    }).toList(),
-                    onChanged: selectedDers == null ? null : _onKonuChanged,
-                    disabledHint: const Text("Önce Ders Seçiniz"),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 32),
 
-                  // --- 3. ARAÇ SEÇİMİ ---
-                  DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      labelText: selectedKonu == null ? "Önce Konu Seçiniz" : "Çalışma Aracını Seçiniz",
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.build),
-                      filled: selectedKonu == null,
-                      fillColor: Colors.grey.shade200,
-                    ),
-                    initialValue: selectedArac,
-                    items: araclar.map((arac) {
-                      return DropdownMenuItem<String>(
-                        value: arac,
-                        child: Text(arac),
-                      );
-                    }).toList(),
-                    onChanged: selectedKonu == null ? null : _onAracChanged,
-                    disabledHint: const Text("Önce Konu Seçiniz"),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // --- ARAÇ ONAY METNİ & 4. KAYNAK SEÇİMİ ---
-                  if (selectedArac != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue.shade200),
-                      ),
-                      child: Text(
-                        "Seçtiğiniz '$selectedArac' aracı için aşağıdan kaynak seçiniz.",
-                        style: TextStyle(color: Colors.blue.shade900, fontStyle: FontStyle.italic),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    
+                    // --- 1. DERS SEÇİMİ ---
                     DropdownButtonFormField<String>(
                       decoration: const InputDecoration(
-                        labelText: "Kaynak Seçiniz",
+                        labelText: "Ders Seçiniz",
                         border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.link),
+                        prefixIcon: Icon(Icons.book),
                       ),
-                      initialValue: selectedKaynak,
-                      items: currentKaynaklar.map((kaynak) {
+                      value: selectedDers,
+                      items: currentDersler.map((ders) {
                         return DropdownMenuItem<String>(
-                          value: kaynak,
-                          child: Text(kaynak),
+                          value: ders,
+                          child: Text(ders),
                         );
                       }).toList(),
-                      onChanged: _onKaynakChanged,
+                      onChanged: _onDersChanged,
                     ),
                     const SizedBox(height: 20),
-                  ],
 
-                  // --- KAYNAK ONAY METNİ & GİT BUTONU ---
-                  if (selectedKaynak != null) ...[
-                     Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.green.shade200),
+                    // --- 2. KONU SEÇİMİ ---
+                    DropdownButtonFormField<String>(
+                      decoration: InputDecoration(
+                        labelText: selectedDers == null ? "Önce Ders Seçiniz" : "Konu Seçiniz",
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.format_list_bulleted),
+                        filled: selectedDers == null,
+                        fillColor: Colors.grey.shade200,
                       ),
-                      child: Text(
-                        "Seçtiğiniz '$selectedKaynak' kaynağına ulaşmanızı sağlayacak link aşağıdadır.",
-                        style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.w500),
-                        textAlign: TextAlign.center,
-                      ),
+                      value: selectedKonu,
+                      items: currentKonular.map((konu) {
+                        return DropdownMenuItem<String>(
+                          value: konu,
+                          child: Text(konu),
+                        );
+                      }).toList(),
+                      onChanged: selectedDers == null ? null : _onKonuChanged,
+                      disabledHint: const Text("Önce Ders Seçiniz"),
                     ),
-                    const SizedBox(height: 24),
-                    
-                    SizedBox(
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        onPressed: _kaynagaGit,
-                        icon: const Icon(Icons.open_in_new),
-                        label: const Text(
-                          "KAYNAĞA GİT",
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    const SizedBox(height: 20),
+
+                    // --- 3. ARAÇ SEÇİMİ ---
+                    DropdownButtonFormField<String>(
+                      decoration: InputDecoration(
+                        labelText: selectedKonu == null ? "Önce Konu Seçiniz" : "Çalışma Aracını Seçiniz",
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.build),
+                        filled: selectedKonu == null,
+                        fillColor: Colors.grey.shade200,
+                      ),
+                      value: selectedArac,
+                      items: araclar.map((arac) {
+                        return DropdownMenuItem<String>(
+                          value: arac,
+                          child: Text(arac),
+                        );
+                      }).toList(),
+                      onChanged: selectedKonu == null ? null : _onAracChanged,
+                      disabledHint: const Text("Önce Konu Seçiniz"),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // --- ARAÇ ONAY METNİ & 4. KAYNAK SEÇİMİ ---
+                    if (selectedArac != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade200),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                        child: Text(
+                          "Seçtiğiniz '$selectedArac' aracı için aşağıdan kaynak seçiniz.",
+                          style: TextStyle(color: Colors.blue.shade900, fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      DropdownButtonFormField<String>(
+                        decoration: const InputDecoration(
+                          labelText: "Kaynak Seçiniz",
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.link),
+                        ),
+                        value: selectedKaynak,
+                        items: currentKaynaklar.map((kaynak) {
+                          return DropdownMenuItem<String>(
+                            value: kaynak,
+                            child: Text(kaynak),
+                          );
+                        }).toList(),
+                        onChanged: _onKaynakChanged,
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // --- KAYNAK ONAY METNİ & GİT BUTONU ---
+                    if (selectedKaynak != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Text(
+                          "Seçtiğiniz '$selectedKaynak' kaynağına ulaşmanızı sağlayacak link aşağıdadır.",
+                          style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.w500),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: _kaynagaGit,
+                          icon: const Icon(Icons.open_in_new),
+                          label: const Text(
+                            "KAYNAĞA GİT",
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ]
-                ],
+                    ],
+                  ],
+                ),
               ),
             ),
           ),

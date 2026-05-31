@@ -114,7 +114,10 @@ class AppDrawer extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.play_lesson, color: Colors.blueAccent),
             title: const Text('Akademik Çalışma Odası', style: TextStyle(fontSize: 16)),
-            onTap: () => _handleTap(context, onStudyRoomTap, '/academic-study-room'),
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/academic-study-room');
+            },
           ),
 
           // --- Detaylı Analiz ve Röntgen ---

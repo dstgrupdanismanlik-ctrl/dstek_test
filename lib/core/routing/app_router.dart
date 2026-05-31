@@ -6,6 +6,7 @@ import '../../core/init/app_initializer.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/home/screens/home_screen.dart';
+import '../../shared/widgets/main_shell.dart';
 
 /// Uygulamanın yönlendirme (routing) yapılandırması.
 ///
@@ -37,7 +38,7 @@ final GoRouter appRouter = GoRouter(
     // Tüm bu rotalar aynı navigasyon grubundadır.
     // context.go() kullanıldığında stack temizlenir ve kabuk korunur.
     ShellRoute(
-      builder: (context, state, child) => child,
+      builder: (context, state, child) => MainShell(child: child),
       routes: [
         GoRoute(
           path: '/home',

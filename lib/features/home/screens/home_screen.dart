@@ -88,11 +88,6 @@ class _HomeScreenState extends State<HomeScreen> {
             _customBody = null;
           });
         },
-        onStudyRoomTap: () {
-          setState(() {
-            _customBody = const AcademicStudyRoomScreen();
-          });
-        },
         onGuidanceTap: () {
           setState(() {
             _customBody = GuidanceCounselingScreen();
@@ -110,19 +105,6 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       body: bodyWidget,
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Ana Sayfa'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Programım'),
-          BottomNavigationBarItem(icon: Icon(Icons.edit_document), label: 'Sınavlar'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Colors.blueAccent,
-        unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
-      ),
     );
   }
 }

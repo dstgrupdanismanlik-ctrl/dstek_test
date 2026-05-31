@@ -478,7 +478,12 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
       appBar: AppBar(
         title: const Text("Çalışma Programım"),
         centerTitle: true,
-        automaticallyImplyLeading: false, 
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.blueAccent,
