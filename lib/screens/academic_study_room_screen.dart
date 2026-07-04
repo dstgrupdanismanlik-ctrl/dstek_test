@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 import '../shared/widgets/app_drawer.dart';
 
 class AcademicStudyRoomScreen extends StatefulWidget {
@@ -9,262 +10,386 @@ class AcademicStudyRoomScreen extends StatefulWidget {
 }
 
 class _AcademicStudyRoomScreenState extends State<AcademicStudyRoomScreen> {
-  // 1. Durum (State) Değişkenleri
+  String? selectedAltSinavTuru;
   String? selectedDers;
   String? selectedKonu;
-  String? selectedArac;
-  String? selectedKaynak;
 
-  // Sisteme giriş yapan öğrencinin sınav türü (Firestore bağlanınca profilden gelecek)
-  final String studentExamType = "YKS";
-
-  // 2. Sahte (Mock) Veritabanı (Firestore'a geçince bu veriler dinamik çekilecek)
-  final Map<String, List<String>> dersler = {
-    "YKS": ["TYT Türkçe", "TYT Matematik", "AYT Fizik"],
-    "LGS": ["LGS Türkçe", "LGS Matematik", "LGS Fen Bilimleri"],
-  };
-
-  final Map<String, List<String>> konular = {
-    "TYT Türkçe": ["Sözcükte Anlam", "Cümlede Anlam", "Paragraf"],
-    "TYT Matematik": ["Temel Kavramlar", "Üslü Sayılar", "Köklü Sayılar"],
-    "AYT Fizik": ["Vektörler", "Bağıl Hareket", "Newton'un Hareket Yasaları"],
-    "LGS Türkçe": ["Fiilimsiler", "Cümlenin Ögeleri", "Metin Türleri"],
-    "LGS Matematik": ["Çarpanlar ve Katlar", "EBOB-EKOK", "Olasılık"],
-    "LGS Fen Bilimleri": ["Mevsimler ve İklim", "DNA ve Genetik Kod", "Basınç"],
-  };
-
-  final List<String> araclar = [
-    "Videolar",
-    "Konu Anlatım Dosyaları (PDF)",
-    "Soru Bankası",
+  final List<StudyTopic> _mockStudyTopics = const [
+    StudyTopic(
+      altSinavTuru: 'TYT',
+      ders: 'Türkçe',
+      konu: 'Paragraf',
+      kocTavsiyesi: 'Paragrafta ana düşünceyi hızlıca bul, bağlaçlara dikkat et ve her paragrafı 1 cümleyle özetle.',
+      googlePdfLink: 'https://www.google.com/search?q=TYT+Paragraf+PDF',
+      googleVideoLink: 'https://www.google.com/search?q=TYT+Paragraf+Video',
+      mebiPdfLink: 'https://www.eba.gov.tr/arama?q=TYT+Paragraf+PDF',
+      mebiVideoLink: 'https://www.eba.gov.tr/arama?q=TYT+Paragraf+Video',
+      kurumsalPdfLink: 'https://dstek.com/assets/tyt_paragraf.pdf',
+      kurumsalVideoLink: 'https://dstek.com/assets/tyt_paragraf_video',
+      soruBankasiLink: 'https://dstek.com/soru-bankasi/tyt_paragraf',
+    ),
+    StudyTopic(
+      altSinavTuru: 'TYT',
+      ders: 'Türkçe',
+      konu: 'Sözcükte Anlam',
+      kocTavsiyesi: 'Sözcük anlamını cümlenin bağlamına göre değerlendir. Eş ve zıt anlamları ayırt et.',
+      googlePdfLink: 'https://www.google.com/search?q=TYT+Sözcükte+Anlam+PDF',
+      googleVideoLink: 'https://www.google.com/search?q=TYT+Sözcükte+Anlam+Video',
+      mebiPdfLink: '',
+      mebiVideoLink: '',
+      kurumsalPdfLink: 'https://dstek.com/assets/tyt_sozcukte_anlam.pdf',
+      kurumsalVideoLink: '',
+      soruBankasiLink: 'https://dstek.com/soru-bankasi/tyt_sozcukte_anlam',
+    ),
+    StudyTopic(
+      altSinavTuru: 'TYT',
+      ders: 'Matematik',
+      konu: 'Üslü Sayılar',
+      kocTavsiyesi: 'Üslü sayılarda taban ve üs ilişkisini ezberlemek yerine örneklerle pekiştir.',
+      googlePdfLink: 'https://www.google.com/search?q=TYT+Üslü+Sayılar+PDF',
+      googleVideoLink: 'https://www.google.com/search?q=TYT+Üslü+Sayılar+Video',
+      mebiPdfLink: 'https://www.eba.gov.tr/arama?q=TYT+Üslü+Sayılar+PDF',
+      mebiVideoLink: 'https://www.eba.gov.tr/arama?q=TYT+Üslü+Sayılar+Video',
+      kurumsalPdfLink: 'https://dstek.com/assets/tyt_uslu_sayilar.pdf',
+      kurumsalVideoLink: 'https://dstek.com/assets/tyt_uslu_sayilar_video',
+      soruBankasiLink: 'https://dstek.com/soru-bankasi/tyt_uslu_sayilar',
+    ),
+    StudyTopic(
+      altSinavTuru: 'AYT',
+      ders: 'Fizik',
+      konu: 'Newton\'un Hareket Yasaları',
+      kocTavsiyesi: 'Newton yasalarında serbest cisim diyagramlarını çizerek kuvvetleri grupla.',
+      googlePdfLink: 'https://www.google.com/search?q=AYT+Newton+Hareket+Yasaları+PDF',
+      googleVideoLink: 'https://www.google.com/search?q=AYT+Newton+Hareket+Yasaları+Video',
+      mebiPdfLink: 'https://www.eba.gov.tr/arama?q=AYT+Newton+PDF',
+      mebiVideoLink: 'https://www.eba.gov.tr/arama?q=AYT+Newton+Video',
+      kurumsalPdfLink: 'https://dstek.com/assets/ayt_newton.pdf',
+      kurumsalVideoLink: 'https://dstek.com/assets/ayt_newton_video',
+      soruBankasiLink: 'https://dstek.com/soru-bankasi/ayt_newton',
+    ),
   ];
 
-  final Map<String, List<String>> kaynaklar = {
-    "Videolar": ["YouTube - DST Kanalı", "EBA TV Gömülü Link", "Özel Kaynak V1"],
-    "Konu Anlatım Dosyaları (PDF)": ["DST Yayınları PDF Föy", "Google Drive Kaynağı", "Özel Ders Notları"],
-    "Soru Bankası": ["DST Dijital Soru Havuzu", "MEB Kazanım Testleri", "Çıkmış Sorular"],
-  };
+  List<String> get _altSinavTurleri => _mockStudyTopics.map((e) => e.altSinavTuru).toSet().toList();
 
-  // 3. Seçim Sıfırlama Mantığı (Üst menü değişince alt menüler temizlenir)
-  void _onDersChanged(String? newValue) {
+  List<String> get _dersListesi {
+    if (selectedAltSinavTuru == null) return [];
+    return _mockStudyTopics
+        .where((e) => e.altSinavTuru == selectedAltSinavTuru)
+        .map((e) => e.ders)
+        .toSet()
+        .toList();
+  }
+
+  List<String> get _konuListesi {
+    if (selectedAltSinavTuru == null || selectedDers == null) return [];
+    return _mockStudyTopics
+        .where((e) => e.altSinavTuru == selectedAltSinavTuru && e.ders == selectedDers)
+        .map((e) => e.konu)
+        .toSet()
+        .toList();
+  }
+
+  StudyTopic? get _selectedStudyTopic {
+    if (selectedAltSinavTuru == null || selectedDers == null || selectedKonu == null) return null;
+    for (final topic in _mockStudyTopics) {
+      if (topic.altSinavTuru == selectedAltSinavTuru && topic.ders == selectedDers && topic.konu == selectedKonu) {
+        return topic;
+      }
+    }
+    return null;
+  }
+
+  void _onAltSinavTuruChanged(String? value) {
     setState(() {
-      selectedDers = newValue;
+      selectedAltSinavTuru = value;
+      selectedDers = null;
       selectedKonu = null;
-      selectedArac = null;
-      selectedKaynak = null;
     });
   }
 
-  void _onKonuChanged(String? newValue) {
+  void _onDersChanged(String? value) {
     setState(() {
-      selectedKonu = newValue;
-      selectedArac = null;
-      selectedKaynak = null;
+      selectedDers = value;
+      selectedKonu = null;
     });
   }
 
-  void _onAracChanged(String? newValue) {
+  void _onKonuChanged(String? value) {
     setState(() {
-      selectedArac = newValue;
-      selectedKaynak = null;
+      selectedKonu = value;
     });
   }
 
-  void _onKaynakChanged(String? newValue) {
-    setState(() {
-      selectedKaynak = newValue;
-    });
-  }
-
-  // 4. Kaynağa Git Aksiyonu
-  void _kaynagaGit() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$selectedKaynak kaynağına yönlendiriliyorsunuz...'),
-        backgroundColor: Colors.green,
-      ),
-    );
+  Future<void> _openLink(String url) async {
+    try {
+      final launched = await launchUrlString(url, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bağlantı açılamadı. Lütfen URL kontrol edin.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bağlantı açılamadı. Lütfen URL kontrol edin.')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentDersler = dersler[studentExamType] ?? [];
-    final currentKonular = selectedDers != null ? konular[selectedDers!] ?? [] : [];
-    final currentKaynaklar = selectedArac != null ? kaynaklar[selectedArac!] ?? [] : [];
-
+    final topic = _selectedStudyTopic;
     return Scaffold(
-      // --- Adım 2: AppDrawer eklendi, context.go('/academic-study-room') ile yönlendiriliyor ---
       drawer: const AppDrawer(),
-      // --- Adım 3: automaticallyImplyLeading: false → geri oku kapalı, hamburger menü açık ---
       appBar: AppBar(
-        title: const Text("Akademik Çalışma Odası"),
+        title: const Text('Akademik Çalışma Odası'),
         centerTitle: true,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
+          constraints: const BoxConstraints(maxWidth: 760),
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
-            child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      "Akademik Materyal Seçimi",
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      "Çalışmak istediğiniz konuya ait dijital materyallere ulaşmak için aşağıdaki seçimleri yapınız.",
-                      style: TextStyle(color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-
-                    // --- 1. DERS SEÇİMİ ---
-                    DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(
-                        labelText: "Ders Seçiniz",
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.book),
-                      ),
-                      value: selectedDers,
-                      items: currentDersler.map((ders) {
-                        return DropdownMenuItem<String>(
-                          value: ders,
-                          child: Text(ders),
-                        );
-                      }).toList(),
-                      onChanged: _onDersChanged,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // --- 2. KONU SEÇİMİ ---
-                    DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        labelText: selectedDers == null ? "Önce Ders Seçiniz" : "Konu Seçiniz",
-                        border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.format_list_bulleted),
-                        filled: selectedDers == null,
-                        fillColor: Colors.grey.shade200,
-                      ),
-                      value: selectedKonu,
-                      items: currentKonular.map((konu) {
-                        return DropdownMenuItem<String>(
-                          value: konu,
-                          child: Text(konu),
-                        );
-                      }).toList(),
-                      onChanged: selectedDers == null ? null : _onKonuChanged,
-                      disabledHint: const Text("Önce Ders Seçiniz"),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // --- 3. ARAÇ SEÇİMİ ---
-                    DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        labelText: selectedKonu == null ? "Önce Konu Seçiniz" : "Çalışma Aracını Seçiniz",
-                        border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.build),
-                        filled: selectedKonu == null,
-                        fillColor: Colors.grey.shade200,
-                      ),
-                      value: selectedArac,
-                      items: araclar.map((arac) {
-                        return DropdownMenuItem<String>(
-                          value: arac,
-                          child: Text(arac),
-                        );
-                      }).toList(),
-                      onChanged: selectedKonu == null ? null : _onAracChanged,
-                      disabledHint: const Text("Önce Konu Seçiniz"),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // --- ARAÇ ONAY METNİ & 4. KAYNAK SEÇİMİ ---
-                    if (selectedArac != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.shade200),
-                        ),
-                        child: Text(
-                          "Seçtiğiniz '$selectedArac' aracı için aşağıdan kaynak seçiniz.",
-                          style: TextStyle(color: Colors.blue.shade900, fontStyle: FontStyle.italic),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      DropdownButtonFormField<String>(
-                        decoration: const InputDecoration(
-                          labelText: "Kaynak Seçiniz",
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.link),
-                        ),
-                        value: selectedKaynak,
-                        items: currentKaynaklar.map((kaynak) {
-                          return DropdownMenuItem<String>(
-                            value: kaynak,
-                            child: Text(kaynak),
-                          );
-                        }).toList(),
-                        onChanged: _onKaynakChanged,
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-
-                    // --- KAYNAK ONAY METNİ & GİT BUTONU ---
-                    if (selectedKaynak != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green.shade200),
-                        ),
-                        child: Text(
-                          "Seçtiğiniz '$selectedKaynak' kaynağına ulaşmanızı sağlayacak link aşağıdadır.",
-                          style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.w500),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Card(
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Akademik Çalışma Odası',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                           textAlign: TextAlign.center,
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        height: 50,
-                        child: ElevatedButton.icon(
-                          onPressed: _kaynagaGit,
-                          icon: const Icon(Icons.open_in_new),
-                          label: const Text(
-                            "KAYNAĞA GİT",
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blueAccent,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Alt sınav türü, ders ve konuyu seçerek size özel çalışma araçlarına hızlıca ulaşın.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.black54),
                         ),
-                      ),
-                    ],
-                  ],
+                        const SizedBox(height: 24),
+                        DropdownButtonFormField<String>(
+                          decoration: const InputDecoration(
+                            labelText: 'Alt Sınav Türü Seçiniz',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.filter_alt),
+                          ),
+                          value: selectedAltSinavTuru,
+                          items: _altSinavTurleri.map((value) {
+                            return DropdownMenuItem(value: value, child: Text(value));
+                          }).toList(),
+                          onChanged: _onAltSinavTuruChanged,
+                        ),
+                        const SizedBox(height: 18),
+                        DropdownButtonFormField<String>(
+                          decoration: InputDecoration(
+                            labelText: selectedAltSinavTuru == null ? 'Önce Alt Sınav Türü Seçiniz' : 'Ders Seçiniz',
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.menu_book),
+                            filled: selectedAltSinavTuru == null,
+                            fillColor: Colors.grey.shade100,
+                          ),
+                          value: selectedDers,
+                          items: _dersListesi.map((value) {
+                            return DropdownMenuItem(value: value, child: Text(value));
+                          }).toList(),
+                          onChanged: selectedAltSinavTuru == null ? null : _onDersChanged,
+                          disabledHint: const Text('Önce Alt Sınav Türü Seçiniz'),
+                        ),
+                        const SizedBox(height: 18),
+                        DropdownButtonFormField<String>(
+                          decoration: InputDecoration(
+                            labelText: selectedDers == null ? 'Önce Ders Seçiniz' : 'Konu Seçiniz',
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.topic),
+                            filled: selectedDers == null,
+                            fillColor: Colors.grey.shade100,
+                          ),
+                          value: selectedKonu,
+                          items: _konuListesi.map((value) {
+                            return DropdownMenuItem(value: value, child: Text(value));
+                          }).toList(),
+                          onChanged: selectedDers == null ? null : _onKonuChanged,
+                          disabledHint: const Text('Önce Ders Seçiniz'),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 24),
+                if (topic != null) _buildDetailSection(topic) else _buildEmptyState(),
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Card(
+      color: Colors.grey.shade50,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(22.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: const [
+            Text(
+              'Konu seçildikten sonra konu detayları ve uygun araçlar burada gösterilecektir.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.black54),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailSection(StudyTopic topic) {
+    final tools = [
+      _StudyTool(title: '🔍 Google PDF Ara', icon: Icons.picture_as_pdf, url: topic.googlePdfLink),
+      _StudyTool(title: '🎥 Google Video Ara', icon: Icons.ondemand_video, url: topic.googleVideoLink),
+      _StudyTool(title: '🏛️ MEBİ / EBA PDF (Resmi)', icon: Icons.menu_book, url: topic.mebiPdfLink),
+      _StudyTool(title: '🏛️ MEBİ / EBA Video (Resmi)', icon: Icons.video_library, url: topic.mebiVideoLink),
+      _StudyTool(title: '📄 Kurumsal Ders Föyü (Dahili PDF)', icon: Icons.description, url: topic.kurumsalPdfLink),
+      _StudyTool(title: '📺 Kurumsal Konu Anlatımı (Dahili Video)', icon: Icons.play_circle_outline, url: topic.kurumsalVideoLink),
+      _StudyTool(title: '📝 Dijital Soru Bankası', icon: Icons.library_books, url: topic.soruBankasiLink),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (topic.kocTavsiyesi != null && topic.kocTavsiyesi!.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.blue.shade100),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 4, right: 12),
+                  child: Icon(Icons.lightbulb, color: Colors.amber, size: 28),
+                ),
+                Expanded(
+                  child: Text(
+                    '💡 Koçun Notu: ${topic.kocTavsiyesi}',
+                    style: const TextStyle(fontSize: 16, height: 1.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+        ],
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(18.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Çalışma Araçları',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: tools.map((tool) {
+                    return _StudyToolButton(
+                      tool: tool,
+                      onTap: tool.url != null && tool.url!.isNotEmpty ? () => _openLink(tool.url!) : null,
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class StudyTopic {
+  final String altSinavTuru;
+  final String ders;
+  final String konu;
+  final String? kocTavsiyesi;
+  final String? googlePdfLink;
+  final String? googleVideoLink;
+  final String? mebiPdfLink;
+  final String? mebiVideoLink;
+  final String? kurumsalPdfLink;
+  final String? kurumsalVideoLink;
+  final String? soruBankasiLink;
+
+  const StudyTopic({
+    required this.altSinavTuru,
+    required this.ders,
+    required this.konu,
+    this.kocTavsiyesi,
+    this.googlePdfLink,
+    this.googleVideoLink,
+    this.mebiPdfLink,
+    this.mebiVideoLink,
+    this.kurumsalPdfLink,
+    this.kurumsalVideoLink,
+    this.soruBankasiLink,
+  });
+}
+
+class _StudyTool {
+  final String title;
+  final IconData icon;
+  final String? url;
+
+  const _StudyTool({
+    required this.title,
+    required this.icon,
+    this.url,
+  });
+}
+
+class _StudyToolButton extends StatelessWidget {
+  final _StudyTool tool;
+  final VoidCallback? onTap;
+
+  const _StudyToolButton({
+    required this.tool,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool active = onTap != null;
+    return SizedBox(
+      width: 170,
+      child: OutlinedButton.icon(
+        onPressed: active ? onTap : null,
+        icon: Icon(tool.icon, size: 20),
+        label: Text(
+          tool.title,
+          style: const TextStyle(fontSize: 13),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: active ? Theme.of(context).colorScheme.primary : Colors.grey,
+          side: BorderSide(color: active ? Theme.of(context).colorScheme.primary : Colors.grey.shade300),
+          backgroundColor: active ? Colors.white : Colors.grey.shade100,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         ),
       ),
     );
