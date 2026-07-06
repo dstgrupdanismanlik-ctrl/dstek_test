@@ -1,60 +1,40 @@
 import 'package:flutter/material.dart';
-import '../shared/widgets/app_drawer.dart';
-
-// --- 1. Veri Modeli ---
-class SubjectItem {
-  final String id;
-  final String name;
-  final double successRate;
-  final int solvedQuestions;
-  bool isCompleted;
-  DateTime? assignedDate;
-
-  SubjectItem({
-    required this.id,
-    required this.name,
-    required this.successRate,
-    required this.solvedQuestions,
-    this.isCompleted = false,
-    this.assignedDate,
-  });
-}
+import 'package:provider/provider.dart';
+import 'package:dstek/features/study_program/models/study_subject.dart';
+import 'package:dstek/features/study_program/providers/study_program_provider.dart';
+import 'package:dstek/shared/widgets/app_drawer.dart';
 
 class StudyProgramScreen extends StatefulWidget {
-  const StudyProgramScreen({Key? key}) : super(key: key);
+  const StudyProgramScreen({super.key});
 
   @override
   State<StudyProgramScreen> createState() => _StudyProgramScreenState();
 }
 
 class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  // Scrollbar'lar için controller'lar (Scrollbar + ScrollView aynı controller'ı paylaşmalı)
+  late final TabController _tabController;
   final ScrollController _kanbanScrollController = ScrollController();
   final ScrollController _weeklyScrollController = ScrollController();
-
-  // 1. Bölüm: State Listeleri (5 Sütun)
-  List<SubjectItem> excellentSubjects = []; 
-  List<SubjectItem> goodSubjects = [];      
-  List<SubjectItem> averageSubjects = [];   
-  List<SubjectItem> poorSubjects = [];      
-  List<SubjectItem> untouchedSubjects = []; 
-  List<SubjectItem> basketSubjects = [];    
-
-  // 2. Bölüm: Takvim State'leri
+  
   DateTime currentWeekStart = DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1));
+  bool isWeeklyView = true;
   int selectedDayIndex = DateTime.now().weekday - 1;
-  bool isWeeklyView = false; 
 
-  final List<String> weekDaysTr = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
-  final List<String> monthsTr = ["", "Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+  final List<String> weekDaysTr = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+  final List<String> monthsTr = ['', 'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+
+  final Map<String, Map<String, dynamic>> columnConfigs = {
+    'column-1': {'title': 'Hiç Çalışılmamış', 'color': Colors.grey},
+    'column-2': {'title': '%70 Altı / Destek Al', 'color': Colors.orange},
+    'column-3': {'title': '%70-79 / Tekrar Et', 'color': Colors.blue},
+    'column-4': {'title': '%80-89 / Soru Çöz', 'color': Colors.green},
+    'column-5': {'title': '%90 Üzeri / Tamamlandı', 'color': Colors.purple},
+  };
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadMockData();
   }
 
   @override
@@ -65,36 +45,7 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
     super.dispose();
   }
 
-  void _loadMockData() {
-    final allMockData = [
-      SubjectItem(id: '1', name: 'T-TR-1-Sözcükte Anlam', successRate: 94.0, solvedQuestions: 280),
-      SubjectItem(id: '2', name: 'T-TR-3-Paragraf', successRate: 92.0, solvedQuestions: 2975),
-      SubjectItem(id: '3', name: 'T-M-3-Temel Kavramlar', successRate: 87.0, solvedQuestions: 218),
-      SubjectItem(id: '4', name: 'T-M-7-Rasyonel Sayılar', successRate: 86.0, solvedQuestions: 245),
-      SubjectItem(id: '5', name: 'A-Fİ-6-Enerji ve Hareket', successRate: 79.0, solvedQuestions: 167),
-      SubjectItem(id: '6', name: 'A-M-16-İntegral', successRate: 79.0, solvedQuestions: 149),
-      SubjectItem(id: '7', name: 'A-M-3-Eşitsizlikler', successRate: 68.0, solvedQuestions: 345),
-      SubjectItem(id: '8', name: 'A-TR-15-Tiyatro', successRate: 61.0, solvedQuestions: 91),
-      SubjectItem(id: '9', name: 'A-K-10-Kimyasal Tepkimelerde Denge', successRate: 0.0, solvedQuestions: 0),
-      SubjectItem(id: '10', name: 'A-B-11-Popülasyon Ekolojisi', successRate: 0.0, solvedQuestions: 0),
-    ];
-
-    for (var item in allMockData) {
-      if (item.solvedQuestions == 0 && item.successRate == 0) {
-        untouchedSubjects.add(item);
-      } else if (item.successRate >= 90) {
-        excellentSubjects.add(item);
-      } else if (item.successRate >= 80) {
-        goodSubjects.add(item);
-      } else if (item.successRate >= 70) {
-        averageSubjects.add(item);
-      } else {
-        poorSubjects.add(item);
-      }
-    }
-  }
-
-  String _formatDate(DateTime date) => "${date.day} ${monthsTr[date.month]}";
+  String _formatDate(DateTime date) => '${date.day} ${monthsTr[date.month]}';
 
   void _changeWeek(int delta) {
     setState(() {
@@ -102,50 +53,57 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
     });
   }
 
-  void _addToBasket(SubjectItem item, List<SubjectItem> sourceList) {
-    setState(() {
-      sourceList.remove(item);
-      basketSubjects.add(item);
-    });
-  }
+  void _showHolidaySelectionDialog(StudyProgramProvider provider) {
+    List<bool> selectedHolidays = [false, false, false, false, false, false, true];
 
-  void _removeFromBasket(SubjectItem item) {
-    setState(() {
-      basketSubjects.remove(item);
-      if (item.solvedQuestions == 0 && item.successRate == 0) {
-        untouchedSubjects.add(item);
-      } else if (item.successRate >= 90) {
-        excellentSubjects.add(item);
-      } else if (item.successRate >= 80) {
-        goodSubjects.add(item);
-      } else if (item.successRate >= 70) {
-        averageSubjects.add(item);
-      } else {
-        poorSubjects.add(item);
-      }
-    });
-  }
-
-  void _createProgram() {
-    if (basketSubjects.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Lütfen önce sepete konu ekleyin!")),
-      );
-      return;
-    }
-    setState(() {
-      for (int i = 0; i < basketSubjects.length; i++) {
-        basketSubjects[i].assignedDate = currentWeekStart.add(Duration(days: i % 7));
-      }
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("${basketSubjects.length} konu haftaya dağıtıldı!"), backgroundColor: Colors.green),
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text("Tatil Günlerini Seçin"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(7, (index) {
+                  return CheckboxListTile(
+                    title: Text(weekDaysTr[index]),
+                    value: selectedHolidays[index],
+                    onChanged: (val) {
+                      setDialogState(() => selectedHolidays[index] = val!);
+                    },
+                  );
+                }),
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () {
+                    List<int> activeDays = [];
+                    for (int i = 0; i < 7; i++) {
+                      if (!selectedHolidays[i]) activeDays.add(i);
+                    }
+                    provider.setActiveDayCount(activeDays.length);
+                    provider.distributeProgram(activeDays);
+                    
+                    Navigator.pop(context);
+                    _tabController.animateTo(1);
+                  },
+                  child: const Text("Dağıtımı Başlat"),
+                )
+              ],
+            );
+          },
+        );
+      },
     );
-    _tabController.animateTo(1);
   }
 
-  // --- BÖLÜM 1: PROGRAM TASARIM MERKEZİ ---
-  Widget _buildSubjectColumn(String title, Color color, List<SubjectItem> items) {
+  Widget _buildSubjectColumn(String columnId, StudyProgramProvider provider) {
+    final config = columnConfigs[columnId]!;
+    final String title = config['title'];
+    final Color color = config['color'];
+    final items = provider.getSubjectsForColumn(columnId);
+
     return Container(
       width: 260,
       margin: const EdgeInsets.only(right: 16.0),
@@ -155,12 +113,11 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
         border: Border.all(color: color.withOpacity(0.3), width: 2),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: const BorderRadius.vertical(top: Radius.circular(10))),
-            child: Text("$title (${items.length})", style: TextStyle(fontWeight: FontWeight.bold, color: color.withOpacity(0.9), fontSize: 14), textAlign: TextAlign.center),
+            child: Center(child: Text('$title (${items.length})', style: TextStyle(fontWeight: FontWeight.bold, color: color.withOpacity(0.9), fontSize: 14))),
           ),
           Expanded(
             child: ListView.builder(
@@ -168,14 +125,19 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
               itemCount: items.length,
               itemBuilder: (context, index) {
                 final item = items[index];
-                return Card(
-                  elevation: 1,
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                    title: Text(item.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    subtitle: Text(item.solvedQuestions == 0 ? "Yeni Konu" : "Başarı: %${item.successRate}", style: const TextStyle(fontSize: 11)),
-                    trailing: IconButton(icon: const Icon(Icons.add_circle, color: Colors.blueAccent), onPressed: () => _addToBasket(item, items)),
+                return Draggable<StudySubject>(
+                  data: item,
+                  feedback: Material(elevation: 6, color: Colors.transparent, child: Container(width: 220, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.blueAccent)), child: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)))),
+                  childWhenDragging: const SizedBox.shrink(),
+                  child: Card(
+                    elevation: 1,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                      title: Text(item.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      subtitle: Text('Saf skor: ${item.safeScore.toStringAsFixed(0)} • Süre: ${item.estimatedStudyHours} saat', style: const TextStyle(fontSize: 11)),
+                      trailing: IconButton(icon: const Icon(Icons.add_circle, color: Colors.blueAccent, size: 20), onPressed: () => provider.addSubjectToBasket(item)),
+                    ),
                   ),
                 );
               },
@@ -186,9 +148,36 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
     );
   }
 
-  Widget _buildProgramBuilderTab() {
+  Widget _buildProgramBuilderTab(StudyProgramProvider provider) {
+    bool isUpdateMode = provider.hasActiveProgram;
+    bool isButtonEnabled = provider.basketSubjects.isNotEmpty || isUpdateMode;
+
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text("Haftalık Toplam Bütçe: ${provider.weeklyBudgetHours} Saat", style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: LinearProgressIndicator(
+                      value: provider.budgetProgress,
+                      minHeight: 10,
+                      backgroundColor: provider.isOverBudget ? Colors.red.shade100 : Colors.blue.shade100,
+                      valueColor: AlwaysStoppedAnimation<Color>(provider.isOverBudget ? Colors.red : Colors.blueAccent),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('Kalan süre: ${provider.remainingHours} saat', style: TextStyle(color: provider.isOverBudget ? Colors.red : Colors.blueGrey, fontSize: 13)),
+            ],
+          ),
+        ),
         Expanded(
           flex: 6,
           child: Scrollbar(
@@ -197,92 +186,109 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
             child: SingleChildScrollView(
               controller: _kanbanScrollController,
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  _buildSubjectColumn("Pekiyi (%90+)", Colors.green, excellentSubjects),
-                  _buildSubjectColumn("İyi (%80-90)", Colors.blue, goodSubjects),
-                  _buildSubjectColumn("Orta (%70-80)", Colors.orange, averageSubjects),
-                  _buildSubjectColumn("Geliştirilmeli (<%70)", Colors.red, poorSubjects),
-                  _buildSubjectColumn("Hiç Çalışılmamış", Colors.grey, untouchedSubjects),
-                ],
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(children: provider.columnOrder.map((colId) => _buildSubjectColumn(colId, provider)).toList()),
             ),
           ),
         ),
-        const Divider(height: 1, thickness: 2),
         Expanded(
           flex: 4,
-          child: Container(
-            color: Colors.grey.shade100,
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: DragTarget<StudySubject>(
+            onAcceptWithDetails: (details) => provider.addSubjectToBasket(details.data),
+            builder: (context, candidateData, rejectedData) {
+              return Container(
+                margin: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: candidateData.isNotEmpty ? Colors.blue.shade50 : Colors.grey.shade100, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade300)),
+                child: Column(
                   children: [
-                    const Text("🛒 Programa Eklenecek Konular", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    Chip(label: Text("${basketSubjects.length} Seçildi"))
+                    const Padding(padding: EdgeInsets.all(8.0), child: Text("🛒 Programa Eklenecek Konular (Sepet)", style: TextStyle(fontWeight: FontWeight.bold))),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: provider.basketSubjects.length,
+                        itemBuilder: (context, index) {
+                          final item = provider.basketSubjects[index];
+                          return Card(
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            child: ListTile(
+                              dense: true,
+                              title: Text(item.name, style: const TextStyle(fontSize: 13)),
+                              trailing: IconButton(icon: const Icon(Icons.remove_circle, color: Colors.red), onPressed: () => provider.removeFromBasket(item)),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 45,
+                        child: ElevatedButton.icon(
+                          onPressed: isButtonEnabled ? () => _showHolidaySelectionDialog(provider) : null,
+                          icon: Icon(isUpdateMode ? Icons.update : Icons.calendar_month),
+                          label: Text(isUpdateMode ? "PROGRAMI GÜNCELLE" : "PROGRAMI YAP"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isUpdateMode ? Colors.orange.shade600 : Colors.blueAccent,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                    )
                   ],
                 ),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: basketSubjects.length,
-                    itemBuilder: (context, index) {
-                      final item = basketSubjects[index];
-                      return Card(
-                        child: ListTile(
-                          dense: true,
-                          leading: const Icon(Icons.check_circle, color: Colors.green),
-                          title: Text(item.name, style: const TextStyle(fontSize: 13)),
-                          trailing: IconButton(icon: const Icon(Icons.remove_circle_outline, color: Colors.red), onPressed: () => _removeFromBasket(item)),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  onPressed: _createProgram,
-                  icon: const Icon(Icons.calendar_month),
-                  label: const Text("PROGRAMI YAP", style: TextStyle(fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
-                )
-              ],
-            ),
+              );
+            },
           ),
         ),
       ],
     );
   }
 
-  // --- BÖLÜM 2: TAKVİM GÖRÜNÜMLERİ ---
-  Widget _buildDailyTaskCard(SubjectItem item) {
+  Widget _buildTaskCardUI(StudySubject task, StudyProgramProvider provider, {bool isCompact = false}) {
+    bool isSaved = provider.isProgramSaved;
+
     return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
+      elevation: isCompact ? 1 : 2,
+      color: task.isCompleted ? Colors.green.shade50 : Colors.white,
+      margin: EdgeInsets.only(bottom: isCompact ? 6 : 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         children: [
           ListTile(
-            leading: Checkbox(value: item.isCompleted, activeColor: Colors.green, onChanged: (val) => setState(() => item.isCompleted = val ?? false)),
-            title: Text(item.name, style: TextStyle(fontWeight: FontWeight.bold, decoration: item.isCompleted ? TextDecoration.lineThrough : null)),
-            subtitle: Text(item.solvedQuestions == 0 ? "Durum: Yeni Konu" : "Durum: %${item.successRate} Başarı"),
+            contentPadding: EdgeInsets.symmetric(horizontal: isCompact ? 4 : 16, vertical: 0),
+            leading: Checkbox(
+              value: task.isCompleted,
+              activeColor: Colors.green,
+              onChanged: (val) => setState(() => task.isCompleted = val ?? false),
+            ),
+            title: Text(
+              task.name, 
+              style: TextStyle(fontSize: isCompact ? 11 : 14, fontWeight: FontWeight.bold, decoration: task.isCompleted ? TextDecoration.lineThrough : null),
+              maxLines: isCompact ? 2 : null, overflow: isCompact ? TextOverflow.ellipsis : null,
+            ),
+            subtitle: isCompact ? null : Text('Durum: ${task.effectiveScore.toStringAsFixed(0)} puan'),
+            trailing: isSaved ? null : IconButton(
+              icon: Icon(Icons.delete, color: Colors.red, size: isCompact ? 16 : 24),
+              onPressed: () => provider.removeFromProgram(task),
+            ),
           ),
-          const Divider(height: 1),
-          Container(
-            padding: const EdgeInsets.all(12),
-            width: double.infinity,
-            color: Colors.blue.shade50,
-            child: Text("Koçun Notu: ${item.solvedQuestions == 0 ? "Temel kavramları iyi oturtmalısın." : "Eksik kazanımlara odaklanarak 2 test çöz."}"),
-          )
+          if (!isCompact) ...[
+            const Divider(height: 1),
+            Container(
+              padding: const EdgeInsets.all(12),
+              width: double.infinity,
+              decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12))),
+              child: Text('Koçun Notu: ${task.opticalSuccess < 70 ? 'Temel kavramları tekrar et.' : 'Eksik kazanımlara odaklan.'}'),
+            ),
+          ]
         ],
       ),
     );
   }
 
-  Widget _buildWeeklyGridView() {
+  Widget _buildWeeklyGridView(StudyProgramProvider provider) {
+    bool isSaved = provider.isProgramSaved;
+
     return Expanded(
       child: Container(
         color: Colors.grey.shade100,
@@ -296,77 +302,60 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: List.generate(7, (dayIndex) {
-                DateTime loopDay = currentWeekStart.add(Duration(days: dayIndex));
-                List<SubjectItem> dayTasks = basketSubjects.where((item) => 
-                  item.assignedDate != null && 
-                  item.assignedDate!.day == loopDay.day &&
-                  item.assignedDate!.month == loopDay.month
-                ).toList();
+                final loopDay = currentWeekStart.add(Duration(days: dayIndex));
+                final dayTasks = provider.activeProgramSubjects.where((item) => item.assignedDayIndex == dayIndex).toList();
 
-                return Container(
-                  width: 180, 
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: loopDay.day == DateTime.now().day ? Colors.blueAccent : Colors.blueGrey.shade100,
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
-                        ),
-                        child: Column(
-                          children: [
-                            Text(weekDaysTr[dayIndex], style: TextStyle(fontWeight: FontWeight.bold, color: loopDay.day == DateTime.now().day ? Colors.white : Colors.black87)),
-                            Text(_formatDate(loopDay), style: TextStyle(fontSize: 12, color: loopDay.day == DateTime.now().day ? Colors.white70 : Colors.black54)),
-                          ],
-                        ),
+                return DragTarget<StudySubject>(
+                  onWillAcceptWithDetails: (_) => !isSaved,
+                  onAcceptWithDetails: (details) => provider.changeSubjectDay(details.data, dayIndex),
+                  builder: (context, candidateData, rejectedData) {
+                    return Container(
+                      width: 220,
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
+                      decoration: BoxDecoration(
+                        color: candidateData.isNotEmpty ? Colors.blue.shade50 : Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: candidateData.isNotEmpty ? Colors.blue : Colors.grey.shade300),
                       ),
-                      Expanded(
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(4),
-                          itemCount: dayTasks.length,
-                          itemBuilder: (context, taskIndex) {
-                            final task = dayTasks[taskIndex];
-                            return Card(
-                              elevation: 1,
-                              color: task.isCompleted ? Colors.green.shade50 : Colors.white,
-                              margin: const EdgeInsets.only(bottom: 6),
-                              child: Padding(
-                                padding: const EdgeInsets.all(4.0),
-                                child: Row(
-                                  children: [
-                                    SizedBox(
-                                      height: 24,
-                                      width: 24,
-                                      child: Checkbox(
-                                        value: task.isCompleted,
-                                        activeColor: Colors.green,
-                                        onChanged: (val) => setState(() => task.isCompleted = val ?? false),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Text(
-                                        task.name,
-                                        style: TextStyle(fontSize: 11, decoration: task.isCompleted ? TextDecoration.lineThrough : null),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      )
-                    ],
-                  ),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: loopDay.day == DateTime.now().day ? Colors.blueAccent : Colors.blueGrey.shade600,
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(weekDaysTr[dayIndex], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                                Text(_formatDate(loopDay), style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: ListView.builder(
+                              padding: const EdgeInsets.all(6),
+                              itemCount: dayTasks.length,
+                              itemBuilder: (context, taskIndex) {
+                                final task = dayTasks[taskIndex];
+                                final cardUI = _buildTaskCardUI(task, provider, isCompact: true);
+                                
+                                if (isSaved) return cardUI;
+
+                                return Draggable<StudySubject>(
+                                  data: task,
+                                  feedback: Material(elevation: 4, child: Card(child: Padding(padding: const EdgeInsets.all(8.0), child: Text(task.name)))),
+                                  childWhenDragging: const Opacity(opacity: 0.3, child: Card(child: ListTile(title: Text("Taşınıyor...")))),
+                                  child: cardUI,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 );
               }),
             ),
@@ -376,9 +365,63 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
     );
   }
 
-  Widget _buildDailyCalendarTab() {
-    DateTime endOfWeek = currentWeekStart.add(const Duration(days: 6));
-    String weekRangeString = "${_formatDate(currentWeekStart)} - ${_formatDate(endOfWeek)}";
+  Widget _buildDailyDetailedView(StudyProgramProvider provider) {
+    final dayTasks = provider.activeProgramSubjects.where((item) => item.assignedDayIndex == selectedDayIndex).toList();
+
+    return Expanded(
+      child: Column(
+        children: [
+          Container(
+            height: 70,
+            color: Colors.white,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: 7,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              itemBuilder: (context, index) {
+                bool isSelected = selectedDayIndex == index;
+                return GestureDetector(
+                  onTap: () => setState(() => selectedDayIndex = index),
+                  child: Container(
+                    width: 60,
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.blueAccent : Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        weekDaysTr[index], 
+                        style: TextStyle(color: isSelected ? Colors.white : Colors.black87, fontWeight: FontWeight.bold)
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: dayTasks.isEmpty 
+              ? const Center(child: Text("Bu güne atanmış bir görev bulunmuyor.", style: TextStyle(color: Colors.grey)))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: dayTasks.length,
+                  itemBuilder: (context, index) => _buildTaskCardUI(dayTasks[index], provider, isCompact: false),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyCalendarTab(StudyProgramProvider provider) {
+    if (!provider.hasActiveProgram) {
+      return const Center(child: Text("Henüz aktif bir programınız yok.\nTasarım Merkezi'nden program oluşturun.", textAlign: TextAlign.center));
+    }
+
+    final endOfWeek = currentWeekStart.add(const Duration(days: 6));
+    final weekRangeString = '${_formatDate(currentWeekStart)} - ${_formatDate(endOfWeek)}';
 
     return Column(
       children: [
@@ -401,8 +444,8 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
                 borderRadius: BorderRadius.circular(8),
                 constraints: const BoxConstraints(minHeight: 32, minWidth: 60),
                 children: const [
-                  Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text("Gün")),
-                  Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text("Hafta")),
+                  Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('Gün')),
+                  Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('Hafta')),
                 ],
               ),
             ],
@@ -410,97 +453,60 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
         ),
         const Divider(height: 1),
         
-        if (isWeeklyView) 
-          _buildWeeklyGridView()
-        else ...[
+        if (isWeeklyView) _buildWeeklyGridView(provider) else _buildDailyDetailedView(provider),
+
+        if (!provider.isProgramSaved)
           Container(
-            height: 70,
-            color: Colors.white,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: 7,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemBuilder: (context, index) {
-                bool isSelected = selectedDayIndex == index;
-                DateTime currentDay = currentWeekStart.add(Duration(days: index));
-                return GestureDetector(
-                  onTap: () => setState(() => selectedDayIndex = index),
-                  child: Container(
-                    width: 55,
-                    margin: const EdgeInsets.only(right: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Colors.blueAccent : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                      border: isSelected ? Border.all(color: Colors.blue.shade800, width: 2) : Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(weekDaysTr[index], style: TextStyle(color: isSelected ? Colors.white : Colors.black54, fontSize: 12)),
-                        Text(currentDay.day.toString(), style: TextStyle(color: isSelected ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
-                      ],
-                    ),
-                  ),
-                );
+            padding: const EdgeInsets.all(16),
+            width: double.infinity,
+            decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.grey.shade300))),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                provider.saveProgram();
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Program başarıyla kalıcı olarak kaydedildi."), backgroundColor: Colors.green));
               },
+              icon: const Icon(Icons.check_circle),
+              label: const Text("PROGRAMI KAYDET"),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
             ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: Builder(
-              builder: (context) {
-                DateTime selectedFullDate = currentWeekStart.add(Duration(days: selectedDayIndex));
-                List<SubjectItem> todaysTasks = basketSubjects.where((item) => 
-                  item.assignedDate != null && item.assignedDate!.day == selectedFullDate.day && item.assignedDate!.month == selectedFullDate.month
-                ).toList();
-
-                if (todaysTasks.isEmpty) {
-                  return const Center(child: Text("Bu güne ait görev yok.", style: TextStyle(color: Colors.grey)));
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: todaysTasks.length,
-                  itemBuilder: (context, index) => _buildDailyTaskCard(todaysTasks[index]),
-                );
-              },
-            ),
-          ),
-        ],
+          )
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: const AppDrawer(),
-      appBar: AppBar(
-        title: const Text("Çalışma Programım"),
-        centerTitle: true,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
+    return Consumer<StudyProgramProvider>(
+      builder: (context, provider, _) {
+        return Scaffold(
+          drawer: const AppDrawer(),
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            title: const Text('Çalışma Programım'),
+            centerTitle: true,
+            leading: Builder(
+              builder: (context) => IconButton(icon: const Icon(Icons.menu), onPressed: () => Scaffold.of(context).openDrawer()),
+            ),
+            bottom: TabBar(
+              controller: _tabController,
+              labelColor: Colors.blueAccent,
+              indicatorColor: Colors.blueAccent,
+              tabs: const [
+                Tab(icon: Icon(Icons.dashboard_customize), text: 'Tasarım'),
+                Tab(icon: Icon(Icons.event_note), text: 'Takvim'),
+              ],
+            ),
           ),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.blueAccent,
-          indicatorColor: Colors.blueAccent,
-          tabs: const [
-            Tab(icon: Icon(Icons.dashboard_customize), text: "Tasarım"),
-            Tab(icon: Icon(Icons.event_note), text: "Takvim"),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildProgramBuilderTab(),
-          _buildDailyCalendarTab(), 
-        ],
-      ),
+          body: TabBarView(
+            controller: _tabController,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _buildProgramBuilderTab(provider),
+              _buildDailyCalendarTab(provider),
+            ],
+          ),
+        );
+      },
     );
   }
 }
