@@ -13,15 +13,11 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _calculateSelectedIndex(BuildContext context) {
     final String location = GoRouterState.of(context).uri.path;
-    if (location.startsWith('/home')) {
-      return 0;
-    }
-    if (location.startsWith('/study-program')) {
-      return 1;
-    }
-    // Sınavlar sekmesine (index 2) veya profil sekmesine (index 3) geçişler
-    // uygulamanın kendi iç mantığıyla ayarlandığı için şimdilik route'a dayalı 
-    // basic bir mapping yapıyoruz.
+    if (location.startsWith('/home')) return 0;
+    if (location.startsWith('/study-program')) return 1;
+    if (location.startsWith('/exams')) return 2;
+    if (location.startsWith('/profile')) return 3;
+    
     return 0;
   }
 
@@ -31,10 +27,9 @@ class _MainShellState extends State<MainShell> {
     } else if (index == 1) {
       context.go('/study-program');
     } else if (index == 2) {
-      // Şimdilik test sekmesine ana sayfadan geçiliyor varsayıyoruz
-      context.go('/home');
+      context.go('/exams'); 
     } else if (index == 3) {
-      context.go('/home');
+      context.go('/profile'); 
     }
   }
 
@@ -43,8 +38,6 @@ class _MainShellState extends State<MainShell> {
     final currentIndex = _calculateSelectedIndex(context);
 
     return Scaffold(
-      // Bu dış kabuk sadece body ve bottom bar'ı içerir.
-      // Her sayfanın kendi AppBar'ı ve Drawer'ı kendi içindeki Scaffold'unda bulunur.
       body: widget.child,
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:dstek/shared/widgets/app_drawer.dart'; // EKLENDİ: Sandviç menü bağlantısı
 
 // 1. Veri Modeli
 class GuidanceItem {
@@ -25,10 +26,13 @@ class GuidanceCounselingScreen extends StatelessWidget {
   final List<GuidanceItem> leftColumnItems = [
     GuidanceItem(
       title: "Sistem Kılavuzu: DSTEK Nasıl Kullanılır?",
-      content: "DSTEK, LGS ve YKS gibi sınavlara hazırlık sürecinde seni takip eden akıllı bir asistandır. 'Çalışma Programım' sekmesinden günlük görevlerini takip edebilir, 'Test ve Sınav Merkezi'nden çözdüğün kaynakların netlerini sisteme girebilirsin. Koçun bu verileri analiz ederek sana en uygun rotayı çizer.\n\n"
-               "DSTEK, LGS ve YKS gibi sınavlara hazırlık sürecinde seni takip eden akıllı bir asistandır. 'Çalışma Programım' sekmesinden günlük görevlerini takip edebilir, 'Test ve Sınav Merkezi'nden çözdüğün kaynakların netlerini sisteme girebilirsin. Koçun bu verileri analiz ederek sana en uygun rotayı çizer.\n\n"
-               "DSTEK, LGS ve YKS gibi sınavlara hazırlık sürecinde seni takip eden akıllı bir asistandır. 'Çalışma Programım' sekmesinden günlük görevlerini takip edebilir, 'Test ve Sınav Merkezi'nden çözdüğün kaynakların netlerini sisteme girebilirsin. Koçun bu verileri analiz ederek sana en uygun rotayı çizer.\n\n"
-               "DSTEK, LGS ve YKS gibi sınavlara hazırlık sürecinde seni takip eden akıllı bir asistandır. 'Çalışma Programım' sekmesinden günlük görevlerini takip edebilir, 'Test ve Sınav Merkezi'nden çözdüğün kaynakların netlerini sisteme girebilirsin. Koçun bu verileri analiz ederek sana en uygun rotayı çizer.",
+      content: '''DSTEK, LGS ve YKS gibi sınavlara hazırlık sürecinde seni takip eden akıllı bir asistandır. 'Çalışma Programım' sekmesinden günlük görevlerini takip edebilir, 'Test ve Sınav Merkezi'nden çözdüğün kaynakların netlerini sisteme girebilirsin. Koçun bu verileri analiz ederek sana en uygun rotayı çizer.
+
+DSTEK, LGS ve YKS gibi sınavlara hazırlık sürecinde seni takip eden akıllı bir asistandır. 'Çalışma Programım' sekmesinden günlük görevlerini takip edebilir, 'Test ve Sınav Merkezi'nden çözdüğün kaynakların netlerini sisteme girebilirsin. Koçun bu verileri analiz ederek sana en uygun rotayı çizer.
+
+DSTEK, LGS ve YKS gibi sınavlara hazırlık sürecinde seni takip eden akıllı bir asistandır. 'Çalışma Programım' sekmesinden günlük görevlerini takip edebilir, 'Test ve Sınav Merkezi'nden çözdüğün kaynakların netlerini sisteme girebilirsin. Koçun bu verileri analiz ederek sana en uygun rotayı çizer.
+
+DSTEK, LGS ve YKS gibi sınavlara hazırlık sürecinde seni takip eden akıllı bir asistandır. 'Çalışma Programım' sekmesinden günlük görevlerini takip edebilir, 'Test ve Sınav Merkezi'nden çözdüğün kaynakların netlerini sisteme girebilirsin. Koçun bu verileri analiz ederek sana en uygun rotayı çizer.''',
       icon: Icons.menu_book,
     ),
     GuidanceItem(
@@ -147,9 +151,17 @@ class GuidanceCounselingScreen extends StatelessWidget {
     final allItems = [...leftColumnItems, ...rightColumnItems];
 
     return Scaffold(
+      drawer: const AppDrawer(), // EKLENDİ: Sandviç menüyü sayfaya dahil eder
       appBar: AppBar(
         title: const Text("Rehberlik ve Yönlendirme"),
         centerTitle: true,
+        automaticallyImplyLeading: false, // EKLENDİ: Geri okunu İPTAL EDER
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(), // EKLENDİ: Menü ikonunu basar
+          ),
+        ),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {

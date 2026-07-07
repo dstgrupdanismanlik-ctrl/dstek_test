@@ -3,49 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../features/auth/providers/auth_provider.dart';
 
-/// Uygulamanın her ekranında kullanılabilen evrensel Drawer widget'ı.
-///
-/// HomeScreen'e özgü state işlemleri (sınav modu seçimi, özel body gösterimi vb.)
-/// isteğe bağlı [callback]'ler aracılığıyla enjekte edilir.
-/// Callback sağlanmazsa ilgili öğe go_router üzerinden [fallbackRoute]'a yönlendirir.
 class AppDrawer extends StatelessWidget {
-  /// Test girişleri alanı seçildiğinde çağrılır (HomeScreen'e özgü).
-  final VoidCallback? onExamTestTap;
-
-  /// Deneme girişleri alanı seçildiğinde çağrılır (HomeScreen'e özgü).
-  final VoidCallback? onExamPracticeTap;
-
-  /// Akademik Çalışma Odası seçildiğinde çağrılır. null ise '/academic-study-room' rotasına gider.
-  final VoidCallback? onStudyRoomTap;
-
-  /// Rehberlik ve Yönlendirme seçildiğinde çağrılır (HomeScreen'e özgü).
-  final VoidCallback? onGuidanceTap;
-
-  /// Envanter Sistemi seçildiğinde çağrılır (HomeScreen'e özgü).
-  final VoidCallback? onInventoryTap;
-
-  /// Sorumluluklar ve Ödevler seçildiğinde çağrılır (HomeScreen'e özgü).
-  final VoidCallback? onTasksTap;
-
-  const AppDrawer({
-    super.key,
-    this.onExamTestTap,
-    this.onExamPracticeTap,
-    this.onStudyRoomTap,
-    this.onGuidanceTap,
-    this.onInventoryTap,
-    this.onTasksTap,
-  });
-
-  /// Drawer'ı kapatır, callback varsa çalıştırır; yoksa [fallbackRoute]'a gider.
-  void _handleTap(BuildContext context, VoidCallback? callback, String fallbackRoute) {
-    Navigator.pop(context);
-    if (callback != null) {
-      callback();
-    } else {
-      context.go(fallbackRoute);
-    }
-  }
+  const AppDrawer({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -84,30 +43,14 @@ class AppDrawer extends StatelessWidget {
             },
           ),
 
-          // --- Sorumluluklar ve Ödevler ---
-          ListTile(
-            leading: const Icon(Icons.task_alt, color: Colors.blueAccent),
-            title: const Text('Sorumluluklar ve Ödevler', style: TextStyle(fontSize: 16)),
-            onTap: () => _handleTap(context, onTasksTap, '/home'),
-          ),
-
           // --- Test ve Sınav Merkezi ---
-          ExpansionTile(
+          ListTile(
             leading: const Icon(Icons.edit_document, color: Colors.blueAccent),
             title: const Text('Test ve Sınav Merkezi', style: TextStyle(fontSize: 16)),
-            initiallyExpanded: true,
-            children: [
-              ListTile(
-                contentPadding: const EdgeInsets.only(left: 56.0),
-                title: const Text('Test girişleri alanı', style: TextStyle(fontSize: 14)),
-                onTap: () => _handleTap(context, onExamTestTap, '/home'),
-              ),
-              ListTile(
-                contentPadding: const EdgeInsets.only(left: 56.0),
-                title: const Text('Deneme girişleri alanı', style: TextStyle(fontSize: 14)),
-                onTap: () => _handleTap(context, onExamPracticeTap, '/home'),
-              ),
-            ],
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/exams');
+            },
           ),
 
           // --- Akademik Çalışma Odası ---
@@ -142,14 +85,20 @@ class AppDrawer extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.explore, color: Colors.blueAccent),
             title: const Text('Rehberlik ve Yönlendirme', style: TextStyle(fontSize: 16)),
-            onTap: () => _handleTap(context, onGuidanceTap, '/home'),
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/guidance-counseling');
+            },
           ),
 
           // --- Envanter Sistemi ---
           ListTile(
             leading: const Icon(Icons.psychology, color: Colors.blueAccent),
             title: const Text('Envanter Sistemi', style: TextStyle(fontSize: 16)),
-            onTap: () => _handleTap(context, onInventoryTap, '/home'),
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/inventory-system');
+            },
           ),
 
           const Divider(),
@@ -162,16 +111,25 @@ class AppDrawer extends StatelessWidget {
               ListTile(
                 contentPadding: const EdgeInsets.only(left: 56.0),
                 title: const Text('Şifre Değiştirme', style: TextStyle(fontSize: 14)),
-                onTap: () {},
+                onTap: () {}, // TODO: Şifre değiştirme rotası eklenecek
+              ),
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 56.0),
+                title: const Text('Sistem Kurulumu (Admin)', style: TextStyle(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                onTap: () {
+                  Navigator.pop(context); // Menüyü kapat
+                  context.go('/admin-settings'); // Admin sayfasına git
+                },
               ),
             ],
           ),
 
           // --- Çıkış Yap ---
           ListTile(
-            leading: const Icon(Icons.exit_to_app, color: Colors.blueAccent),
-            title: const Text('Çıkış Yap', style: TextStyle(fontSize: 16)),
+            leading: const Icon(Icons.exit_to_app, color: Colors.redAccent),
+            title: const Text('Çıkış Yap', style: TextStyle(fontSize: 16, color: Colors.redAccent)),
             onTap: () async {
+              Navigator.pop(context);
               await context.read<AuthProvider>().signOut();
             },
           ),

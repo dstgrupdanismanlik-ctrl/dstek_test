@@ -2,6 +2,8 @@ class StudySubject {
   StudySubject({
     required this.id,
     required this.name,
+    required this.courseName,
+    required this.programOrder,
     required this.opticalSuccess,
     required this.manualSuccess,
     required this.estimatedStudyHours,
@@ -14,6 +16,8 @@ class StudySubject {
 
   final String id;
   final String name;
+  final String courseName;
+  final int programOrder;
   final double opticalSuccess;
   final double manualSuccess;
   final int estimatedStudyHours;

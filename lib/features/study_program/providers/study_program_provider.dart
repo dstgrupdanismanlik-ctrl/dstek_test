@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/study_subject.dart';
 
 class StudyProgramProvider extends ChangeNotifier {
   StudyProgramProvider() {
-    _seedMockSubjects();
+    _loadFromFirestore();
   }
 
   final List<StudySubject> _subjects = [];
@@ -17,6 +18,14 @@ class StudyProgramProvider extends ChangeNotifier {
     'column-4',
     'column-5',
   ];
+
+  final Map<String, String?> _columnFilters = {
+    'column-1': null,
+    'column-2': null,
+    'column-3': null,
+    'column-4': null,
+    'column-5': null,
+  };
 
   int _activeDayCount = 6;
   int _remainingHours = 50;
@@ -48,39 +57,109 @@ class StudyProgramProvider extends ChangeNotifier {
     return 50 - ((6 - activeDayCount) * 8);
   }
 
-  void _seedMockSubjects() {
-    final data = [
-      StudySubject(id: '1', name: 'T-TR-1-Sözcükte Anlam', opticalSuccess: 94, manualSuccess: 70, estimatedStudyHours: 4, lastTestScore: 95, columnId: 'column-5'),
-      StudySubject(id: '2', name: 'T-TR-3-Paragraf', opticalSuccess: 92, manualSuccess: 74, estimatedStudyHours: 4, lastTestScore: 94, columnId: 'column-5'),
-      StudySubject(id: '3', name: 'T-M-3-Temel Kavramlar', opticalSuccess: 87, manualSuccess: 72, estimatedStudyHours: 4, lastTestScore: 88, columnId: 'column-4'),
-      StudySubject(id: '4', name: 'T-M-7-Rasyonel Sayılar', opticalSuccess: 86, manualSuccess: 71, estimatedStudyHours: 4, lastTestScore: 84, columnId: 'column-4'),
-      StudySubject(id: '5', name: 'A-Fİ-6-Enerji ve Hareket', opticalSuccess: 79, manualSuccess: 68, estimatedStudyHours: 4, lastTestScore: 77, columnId: 'column-3'),
-      StudySubject(id: '6', name: 'A-M-16-İntegral', opticalSuccess: 79, manualSuccess: 67, estimatedStudyHours: 4, lastTestScore: 76, columnId: 'column-3'),
-      StudySubject(id: '7', name: 'A-M-3-Eşitsizlikler', opticalSuccess: 68, manualSuccess: 64, estimatedStudyHours: 4, lastTestScore: 69, columnId: 'column-2'),
-      StudySubject(id: '8', name: 'A-TR-15-Tiyatro', opticalSuccess: 61, manualSuccess: 60, estimatedStudyHours: 4, lastTestScore: 62, columnId: 'column-2'),
-      StudySubject(id: '9', name: 'A-K-10-Kimyasal Tepkimelerde Denge', opticalSuccess: 0, manualSuccess: 0, estimatedStudyHours: 4, lastTestScore: 0, columnId: 'column-1'),
-      StudySubject(id: '10', name: 'A-B-11-Popülasyon Ekolojisi', opticalSuccess: 0, manualSuccess: 0, estimatedStudyHours: 4, lastTestScore: 0, columnId: 'column-1'),
-    ];
-    _subjects.addAll(data);
+  Future<void> _loadFromFirestore() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('curriculum').get();
+
+      final List<StudySubject> loadedSubjects = [];
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+
+        final String konuKodu = data['konu_kodu']?.toString() ?? '';
+        final String konuAdi = data['konu_adi']?.toString() ?? 'İsimsiz Konu';
+        final String dersAdi = data['ders_adi']?.toString() ?? 'Bilinmeyen Ders';
+        final int saat = int.tryParse(data['tahmini_calisma_saati']?.toString() ?? '4') ?? 4;
+        final int sira = int.tryParse(data['program_sirasi']?.toString().trim() ?? '9999') ?? 9999;
+
+        if (data['is_active'] == true || data['is_active'] == 'TRUE') {
+          loadedSubjects.add(StudySubject(
+            id: doc.id,
+            name: '$konuKodu - $konuAdi',
+            opticalSuccess: 0.0,
+            manualSuccess: 0.0,
+            estimatedStudyHours: saat,
+            courseName: dersAdi,
+            programOrder: sira,
+            columnId: 'column-1',
+          ));
+        }
+      }
+
+      loadedSubjects.sort((a, b) => a.programOrder.compareTo(b.programOrder));
+
+      _subjects.clear();
+      _subjects.addAll(loadedSubjects);
+      notifyListeners();
+
+    } catch (e) {
+      debugPrint('Firestore çekme hatası: $e');
+      _lastMessage = 'Veritabanına bağlanılamadı. İnternet bağlantınızı kontrol edin.';
+      notifyListeners();
+    }
+  }
+
+  String? getColumnFilter(String columnId) => _columnFilters[columnId];
+
+  List<String> get sortedCourseNames {
+    final List<String> orderedList = [];
+    // _subjects listesi Firestore'dan çekilirken zaten 'program_sirasi' ile dizildi!
+    for (var s in _subjects) {
+      final cName = s.courseName.trim();
+      if (cName.isNotEmpty && !orderedList.contains(cName)) {
+        orderedList.add(cName); // Dizilmiş listede gördüğün ilk yeni dersi ekle
+      }
+    }
+    return orderedList;
+  }
+
+  List<String> getCourseNamesForColumn(String columnId) {
+    final courses = _subjects
+        .where((subject) => subject.columnId == columnId)
+        .map((subject) => subject.courseName)
+        .where((name) => name.trim().isNotEmpty)
+        .toSet()
+        .toList();
+    courses.sort();
+    return courses;
+  }
+
+  void setColumnFilter(String columnId, String? courseName) {
+    _columnFilters[columnId] = courseName;
     notifyListeners();
   }
 
   List<StudySubject> getSubjectsForColumn(String columnId) {
-    return _subjects.where((subject) => subject.columnId == columnId).toList();
+    var list = _subjects.where((subject) => subject.columnId == columnId).toList();
+
+    // BAŞ MİMAR KURALI 1: Dropdown'dan seçilen dersi UYGULA (Filtrele)
+    final filter = _columnFilters[columnId];
+    if (filter != null && filter.isNotEmpty && filter != "Tüm Dersler") {
+      list = list.where((s) => s.courseName.trim() == filter).toList();
+    }
+
+    // BAŞ MİMAR KURALI 2: Filtrelenen listeyi kesin olarak Excel'deki "programOrder" değerine göre diz
+    list.sort((a, b) => a.programOrder.compareTo(b.programOrder));
+
+    return list;
   }
 
   bool addSubjectToBasket(StudySubject subject) {
     if (!_subjects.contains(subject)) return false;
+
     int requiredHours = subject.estimatedStudyHours;
-    if (_remainingHours < requiredHours) {
-      _isOverBudget = true;
-      notifyListeners();
-      return false;
-    }
     _remainingHours -= requiredHours;
-    _isOverBudget = false;
+    _isOverBudget = _remainingHours < 0;
+
     _subjects.remove(subject);
     _basketSubjects.add(subject);
+
+    if (_isOverBudget) {
+      _lastMessage = 'Haftalık bütçenizi aştınız! Bu kadar konuyu çalışmakta zorlanabilirsiniz.';
+    } else {
+      _lastMessage = '${subject.name} sepete eklendi.';
+    }
+
     notifyListeners();
     return true;
   }
@@ -113,18 +192,22 @@ class StudyProgramProvider extends ChangeNotifier {
   }
 
   void distributeProgram(List<int> activeDays) {
-    _activeProgramSubjects.addAll(_basketSubjects);
+    if (activeDays.isEmpty) return;
+
+    // Hem eski programı hem sepettekileri birleştirip yepyeni bir dağıtım yapıyoruz
+    final allToDistribute = [..._activeProgramSubjects, ..._basketSubjects];
+
+    int dayIndex = 0;
+    for (var subject in allToDistribute) {
+      subject.assignedDayIndex = activeDays[dayIndex % activeDays.length];
+      dayIndex++;
+    }
+
+    _activeProgramSubjects.clear();
+    _activeProgramSubjects.addAll(allToDistribute);
     _basketSubjects.clear();
 
-    int dayPointer = 0;
-    for (var item in _activeProgramSubjects) {
-      if (item.assignedDayIndex == null) { 
-         item.assignedDayIndex = activeDays[dayPointer % activeDays.length];
-         dayPointer++;
-      }
-    }
     _hasActiveProgram = true;
-    _isProgramSaved = false; // YENİ: Dağıtım yapılınca "Taslak/Düzenleme" moduna geçer
     notifyListeners();
   }
 

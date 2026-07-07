@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher_string.dart';
-import '../shared/widgets/app_drawer.dart';
+import 'package:dstek/shared/widgets/app_drawer.dart';
 
 class AcademicStudyRoomScreen extends StatefulWidget {
   const AcademicStudyRoomScreen({Key? key}) : super(key: key);

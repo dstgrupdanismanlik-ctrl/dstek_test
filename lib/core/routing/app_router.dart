@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../screens/academic_study_room_screen.dart';
-import '../../screens/study_program_screen.dart';
-import '../../core/init/app_initializer.dart';
-import '../../features/auth/screens/login_screen.dart';
-import '../../features/auth/screens/register_screen.dart';
-import '../../features/home/screens/home_screen.dart';
-import '../../shared/widgets/main_shell.dart';
 
-/// Uygulamanın yönlendirme (routing) yapılandırması.
-///
-/// Mimari:
-/// - Auth rotaları (/, /login, /register) doğrudan kök seviyede yer alır.
-/// - Ana uygulama rotaları (/home, /study-program, /academic-study-room)
-///   bir [ShellRoute] içinde gruplandırılmıştır. Bu sayede bu ekranlar
-///   aynı "kabuk"un (sandviç menü + uygulama kabuğu) parçası olarak
-///   değerlendirilir ve context.go() ile geçiş yapıldığında yeni bir
-///   navigation stack oluşturulmaz.
+import 'package:dstek/features/academic_room/screens/academic_study_room_screen.dart';
+import 'package:dstek/features/study_program/screens/study_program_screen.dart';
+import 'package:dstek/core/init/app_initializer.dart';
+import 'package:dstek/features/auth/screens/login_screen.dart';
+import 'package:dstek/features/auth/screens/register_screen.dart';
+import 'package:dstek/features/home/screens/home_screen.dart';
+import 'package:dstek/shared/widgets/main_shell.dart';
+import 'package:dstek/features/profile/screens/profile_screen.dart';
+import 'package:dstek/features/exams/screens/exam_entry_screen.dart';
+import 'package:dstek/features/guidance_counseling/screens/guidance_counseling_screen.dart';
+import 'package:dstek/features/inventory_system/inventory_system_screen.dart';
+import 'package:dstek/features/admin/screens/admin_settings_screen.dart';
+
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
+
 final GoRouter appRouter = GoRouter(
+  navigatorKey: _rootNavigatorKey,
   initialLocation: '/',
   routes: [
     // --- Auth rotaları (kabuk dışı) ---
@@ -35,9 +36,8 @@ final GoRouter appRouter = GoRouter(
     ),
 
     // --- Ana uygulama kabuğu (ShellRoute) ---
-    // Tüm bu rotalar aynı navigasyon grubundadır.
-    // context.go() kullanıldığında stack temizlenir ve kabuk korunur.
     ShellRoute(
+      navigatorKey: _shellNavigatorKey,
       builder: (context, state, child) => MainShell(child: child),
       routes: [
         GoRoute(
@@ -51,6 +51,26 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: '/academic-study-room',
           builder: (context, state) => const AcademicStudyRoomScreen(),
+        ),
+        GoRoute(
+          path: '/exams',
+          builder: (context, state) => const ExamEntryScreen(),
+        ),
+        GoRoute(
+          path: '/profile',
+          builder: (context, state) => const ProfileScreen(),
+        ),
+        GoRoute(
+          path: '/guidance-counseling',
+          builder: (context, state) => GuidanceCounselingScreen(),
+        ),
+        GoRoute(
+          path: '/inventory-system',
+          builder: (context, state) => InventorySystemScreen(),
+        ),
+        GoRoute(
+          path: '/admin-settings',
+          builder: (context, state) => const AdminSettingsScreen(),
         ),
       ],
     ),

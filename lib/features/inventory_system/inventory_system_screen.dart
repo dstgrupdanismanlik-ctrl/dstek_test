@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:dstek/shared/widgets/app_drawer.dart';
 
 // 1. Veri Modeli (Envanter Kartları İçin)
 class InventoryItem {
@@ -67,7 +68,20 @@ class InventorySystemScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return Scaffold(
+      drawer: const AppDrawer(),
+      appBar: AppBar(
+        title: const Text('Envanter Sistemi'),
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
+      ),
+      body: Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 800), // Web ve Tablet için genişlik sınırı
         child: ListView.builder(
@@ -133,6 +147,7 @@ class InventorySystemScreen extends StatelessWidget {
           },
         ),
       ),
-    );
+    ),
+  );
   }
 }

@@ -1,10 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:dstek/shared/widgets/app_drawer.dart';
+
+// ==========================================
+// ANA KABUK: SINAVLAR MERKEZİ (Düzeltildi)
+// ==========================================
+// ==========================================
+// ANA KABUK: SINAVLAR MERKEZİ
+// ==========================================
+class ExamEntryScreen extends StatelessWidget {
+  const ExamEntryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        drawer: AppDrawer(),
+        appBar: AppBar(
+          title: const Text('Test ve Sınav Merkezi'),
+          centerTitle: true,
+          automaticallyImplyLeading: false,
+          leading: Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ),
+        ),
+        body: Column(
+          children: [
+            Container(
+              color: Colors.grey.shade200,
+              child: const TabBar(
+                labelColor: Colors.blueAccent,
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: Colors.blueAccent,
+                labelStyle: TextStyle(fontWeight: FontWeight.bold),
+                tabs: [
+                  Tab(icon: Icon(Icons.edit), text: 'Test Girişleri'),
+                  Tab(icon: Icon(Icons.assignment), text: 'Deneme Girişleri'),
+                ],
+              ),
+            ),
+            const Expanded(
+              child: TabBarView(
+                children: [
+                  TestEntryScreen(),
+                  PracticeExamEntryScreen(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 // ==========================================
 // EVRENSEL WIDGET: 2 HANE SINIRLI NUMERİK GİRİŞ
-// Dokümantasyon Kuralı: D-Y-B ve Soru Sayısı alanlarına 
-// en fazla 2 haneli rakam girilebilir.
 // ==========================================
 class NumericInputField extends StatelessWidget {
   final String label;
