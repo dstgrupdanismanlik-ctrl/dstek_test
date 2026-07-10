@@ -1,47 +1,58 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class UserModel {
-  final String uid; // Kullanici_Kimligi
-  final String name; // Ad_Soyad
-  final String email; // E_Posta
-  final String role; // Rol: 'ogrenci', 'kurum', 'admin'
-  final String institutionCode; // Kurum_Kodu
-  final bool isActive; // Hesap_Aktif_Mi
-  final DateTime? kvkkApprovalDate; // KVKK_Onay_Tarihi
+  final String uid;
+  final String kurumKodu;
+  final String adSoyad;
+  final String kullaniciAdi;
+  final String ePosta;
+  final String telefonNumarasi;
+  final String rol;
+  final bool isActive;
+  final bool kvkkOnayDurumu;
+  final DateTime kayitTarihi;
 
   UserModel({
     required this.uid,
-    required this.name,
-    required this.email,
-    required this.role,
-    required this.institutionCode,
-    required this.isActive,
-    this.kvkkApprovalDate,
+    required this.kurumKodu,
+    required this.adSoyad,
+    required this.kullaniciAdi,
+    required this.ePosta,
+    required this.telefonNumarasi,
+    required this.rol,
+    this.isActive = true,
+    this.kvkkOnayDurumu = false,
+    required this.kayitTarihi,
   });
 
-  // Veritabanından (Firestore) gelen veriyi Flutter objesine çevirir
-  factory UserModel.fromJson(Map<String, dynamic> json) {
+  factory UserModel.fromMap(Map<String, dynamic> data) {
     return UserModel(
-      uid: json['uid'] ?? '',
-      name: json['name'] ?? '',
-      email: json['email'] ?? '',
-      role: json['role'] ?? 'ogrenci', // Varsayılan rol öğrenci
-      institutionCode: json['institutionCode'] ?? '',
-      isActive: json['isActive'] ?? false, // Yeni kayıtlar varsayılan olarak pasif başlar
-      kvkkApprovalDate: json['kvkkApprovalDate'] != null
-          ? DateTime.parse(json['kvkkApprovalDate'])
-          : null,
+      uid: data['uid'] ?? '',
+      kurumKodu: data['kurum_kodu'] ?? '',
+      adSoyad: data['ad_soyad'] ?? '',
+      kullaniciAdi: data['kullanici_adi'] ?? '',
+      ePosta: data['e_posta'] ?? '',
+      telefonNumarasi: data['telefon_numarasi'] ?? '',
+      rol: data['rol'] ?? 'ogrenci',
+      isActive: data['is_active'] ?? false,
+      kvkkOnayDurumu: data['kvkk_onay_durumu'] ?? false,
+      kayitTarihi:
+          (data['kayit_tarihi'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
-  // Flutter objesini veritabanına (Firestore) yazmak için formata çevirir
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toMap() {
     return {
       'uid': uid,
-      'name': name,
-      'email': email,
-      'role': role,
-      'institutionCode': institutionCode,
-      'isActive': isActive,
-      'kvkkApprovalDate': kvkkApprovalDate?.toIso8601String(),
+      'kurum_kodu': kurumKodu,
+      'ad_soyad': adSoyad,
+      'kullanici_adi': kullaniciAdi,
+      'e_posta': ePosta,
+      'telefon_numarasi': telefonNumarasi,
+      'rol': rol,
+      'is_active': isActive,
+      'kvkk_onay_durumu': kvkkOnayDurumu,
+      'kayit_tarihi': Timestamp.fromDate(kayitTarihi),
     };
   }
 }

@@ -13,7 +13,9 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _institutionCodeController = TextEditingController();
   
@@ -22,7 +24,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _institutionCodeController.dispose();
     super.dispose();
@@ -32,11 +36,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (_formKey.currentState!.validate()) {
       try {
         await context.read<AuthProvider>().signUp(
-              name: _nameController.text.trim(),
               email: _emailController.text.trim(),
               password: _passwordController.text.trim(),
-              role: _selectedRole,
-              institutionCode: _institutionCodeController.text.trim(),
+            name: _nameController.text.trim(),
+            kullaniciAdi: _usernameController.text.trim(),
+            telefonNumarasi: _phoneController.text.trim(),
+            kurumKodu: _institutionCodeController.text.trim(),
+            rol: _selectedRole,
             );
         
         if (mounted) {
@@ -89,6 +95,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   validator: (value) => value!.isEmpty ? 'Ad Soyad boş olamaz' : null,
                 ),
                 const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _usernameController,
+                  decoration: const InputDecoration(labelText: 'Kullanıcı Adı', prefixIcon: Icon(Icons.alternate_email), border: OutlineInputBorder()),
+                  validator: (value) => value!.isEmpty ? 'Kullanıcı adı boş olamaz' : null,
+                ),
+                const SizedBox(height: 16),
                 
                 // E-posta
                 TextFormField(
@@ -96,6 +109,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(labelText: 'E-posta', prefixIcon: Icon(Icons.email), border: OutlineInputBorder()),
                   validator: (value) => value!.isEmpty ? 'E-posta boş olamaz' : null,
+                ),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: 'Telefon Numarası', prefixIcon: Icon(Icons.phone), border: OutlineInputBorder()),
+                  validator: (value) => value!.isEmpty ? 'Telefon numarası boş olamaz' : null,
                 ),
                 const SizedBox(height: 16),
                 

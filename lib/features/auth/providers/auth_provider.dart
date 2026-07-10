@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../profile/models/student_profile_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:dstek/features/auth/models/user_model.dart';
+import 'package:dstek/features/profile/models/student_profile_model.dart';
 
 class AuthProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Arayüzün aradığı Yükleniyor durumu (Dönen çark için)
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
@@ -18,42 +18,48 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Kayıt Ol (Arayüz signUp olarak arıyor)
   Future<void> signUp({
-    required String name,
     required String email,
     required String password,
-    required String role,
-    required String institutionCode,
+    required String name,
+    required String kullaniciAdi,
+    required String telefonNumarasi,
+    required String kurumKodu,
+    required String rol,
   }) async {
     try {
       _setLoading(true);
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+
+      final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      // 1. Ana Kimlik Kartı (users tablosu)
-      await _firestore.collection('users').doc(userCredential.user!.uid).set({
-        'uid': userCredential.user!.uid,
-        'name': name,
-        'email': email,
-        'role': role,
-        'institutionCode': institutionCode,
-        'isActive': true,
-        'createdAt': DateTime.now().toIso8601String(),
-      });
+      final uid = userCredential.user!.uid;
+      final userModel = UserModel(
+        uid: uid,
+        kurumKodu: kurumKodu,
+        adSoyad: name,
+        kullaniciAdi: kullaniciAdi,
+        ePosta: email,
+        telefonNumarasi: telefonNumarasi,
+        rol: rol,
+        kayitTarihi: DateTime.now(),
+      );
 
-      // 2. Öğrenciyse Detaylı Profil Aç (student_profiles tablosu)
-      if (role == 'Öğrenci') {
-        StudentProfileModel newStudentProfile = StudentProfileModel(
-          uid: userCredential.user!.uid,
-          fullName: name,
+      await _firestore.collection('users').doc(uid).set(userModel.toMap());
+
+      if (rol == 'ogrenci') {
+        final studentProfile = StudentProfileModel(
+          kurumKodu: kurumKodu,
+          ogrenciId: uid,
+          koclukBaslangicTarihi: DateTime.now(),
         );
-        
-        await _firestore.collection('student_profiles')
-            .doc(userCredential.user!.uid)
-            .set(newStudentProfile.toMap());
+
+        await _firestore
+            .collection('student_profiles')
+            .doc(uid)
+            .set(studentProfile.toMap());
       }
     } catch (e) {
       rethrow;
@@ -62,7 +68,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Giriş Yap (Arayüz signIn olarak arıyor)
   Future<void> signIn({required String email, required String password}) async {
     try {
       _setLoading(true);
@@ -74,7 +79,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Çıkış Yap
   Future<void> signOut() async {
     await _auth.signOut();
     notifyListeners();

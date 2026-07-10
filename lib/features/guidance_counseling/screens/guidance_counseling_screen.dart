@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:dstek/shared/widgets/app_drawer.dart'; // EKLENDİ: Sandviç menü bağlantısı
+import 'package:dstek/shared/widgets/app_drawer.dart';
 
 // 1. Veri Modeli
 class GuidanceItem {
@@ -10,7 +10,7 @@ class GuidanceItem {
   final bool isLink;
   final String? url;
 
-  GuidanceItem({
+  const GuidanceItem({
     required this.title,
     required this.content,
     required this.icon,
@@ -20,10 +20,10 @@ class GuidanceItem {
 }
 
 class GuidanceCounselingScreen extends StatelessWidget {
-  GuidanceCounselingScreen({Key? key}) : super(key: key);
+  const GuidanceCounselingScreen({super.key});
 
   // 2. Sahte Veri Seti (İlk madde test için bilerek çok uzun tutulmuştur)
-  final List<GuidanceItem> leftColumnItems = [
+  final List<GuidanceItem> leftColumnItems = const [
     GuidanceItem(
       title: "Sistem Kılavuzu: DSTEK Nasıl Kullanılır?",
       content: '''DSTEK, LGS ve YKS gibi sınavlara hazırlık sürecinde seni takip eden akıllı bir asistandır. 'Çalışma Programım' sekmesinden günlük görevlerini takip edebilir, 'Test ve Sınav Merkezi'nden çözdüğün kaynakların netlerini sisteme girebilirsin. Koçun bu verileri analiz ederek sana en uygun rotayı çizer.
@@ -49,7 +49,7 @@ DSTEK, LGS ve YKS gibi sınavlara hazırlık sürecinde seni takip eden akıllı
     ),
   ];
 
-  final List<GuidanceItem> rightColumnItems = [
+  final List<GuidanceItem> rightColumnItems = const [
     GuidanceItem(
       title: "Sınav Sistemleri: YKS Nedir?",
       content: "YKS (Yükseköğretim Kurumları Sınavı), TYT ve AYT olmak üzere iki temel oturumdan oluşur. TYT'de Türkçe, Matematik, Sosyal ve Fen testleri yer alırken; AYT'de alanınıza (SAY, EA, SÖZ, DİL) uygun testleri çözmeniz gerekmektedir.",
@@ -151,15 +151,15 @@ DSTEK, LGS ve YKS gibi sınavlara hazırlık sürecinde seni takip eden akıllı
     final allItems = [...leftColumnItems, ...rightColumnItems];
 
     return Scaffold(
-      drawer: const AppDrawer(), // EKLENDİ: Sandviç menüyü sayfaya dahil eder
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text("Rehberlik ve Yönlendirme"),
         centerTitle: true,
-        automaticallyImplyLeading: false, // EKLENDİ: Geri okunu İPTAL EDER
+        automaticallyImplyLeading: false,
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(), // EKLENDİ: Menü ikonunu basar
+            onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
       ),

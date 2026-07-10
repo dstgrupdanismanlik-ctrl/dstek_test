@@ -31,10 +31,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // Veritabanı Listeleri
   List<String> _cities = [];
-  Map<String, List<dynamic>> _districtsMap = {};
+  Map<String, List<String>> _districtsMap = {};
   List<String> _educationLevels = [];
   List<String> _exams = [];
-  Map<String, dynamic> _examMatrixMap = {};
+  Map<String, List<String>> _examMatrixMap = {
+    'YKS': ['Sayısal', 'Eşit Ağırlık', 'Sözel', 'Dil', 'TYT (Sadece)'],
+    'LGS': ['Genel'],
+  };
 
   bool _isLoading = true;
 
@@ -58,19 +61,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadProfileOptions() async {
     try {
-      final optionsDoc = await _firestore.collection('system_constants').doc('profile_options').get();
-      if (optionsDoc.exists) {
-        final data = optionsDoc.data()!;
-        _districtsMap = Map<String, List<dynamic>>.from(data['cities'] ?? {});
-        _cities = _districtsMap.keys.toList()..sort();
-        _educationLevels = List<String>.from(data['education_levels'] ?? []);
-        _exams = List<String>.from(data['exams'] ?? []);
+      final snapshots = await Future.wait([
+        _firestore.collection('general_definitions').get(),
+        _firestore.collection('system_constants').get(),
+      ]);
+
+      final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[
+        ...snapshots[0].docs,
+        ...snapshots[1].docs,
+      ];
+
+      final citySet = <String>{};
+      final educationSet = <String>{};
+      final examSet = <String>{};
+      final districtTempMap = <String, List<String>>{};
+
+      for (final doc in docs) {
+        final data = doc.data();
+
+        final ilValue = _cleanValue(data['iller'])?.toUpperCase();
+        if (ilValue != null) {
+          citySet.add(ilValue);
+        }
+
+        final il = data['ilceler_icin_iller']?.toString().trim().toUpperCase() ?? '';
+        final ilce = data['ilceler']?.toString().trim() ?? '';
+        if (il.isNotEmpty && ilce.isNotEmpty) {
+          districtTempMap.putIfAbsent(il, () => []).add(ilce);
+          citySet.add(il);
+        }
+
+        educationSet.addAll(_toCleanStringList(data['ogrenim_durumlari']));
+        examSet.addAll(_toCleanStringList(data['sinav_turleri']));
       }
 
-      final matrixDoc = await _firestore.collection('system_constants').doc('exam_matrix').get();
-      if (matrixDoc.exists) {
-        _examMatrixMap = matrixDoc.data() ?? {};
-      }
+      _cities = citySet.toList()..sort();
+      _districtsMap = {
+        for (final entry in districtTempMap.entries)
+          entry.key: (entry.value.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toSet().toList()..sort()),
+      };
+      _educationLevels = educationSet.toList()..sort();
+      _exams = examSet.toList()..sort();
     } catch (e) {
       debugPrint('Sabitler yüklenirken hata: $e');
     } finally {
@@ -78,8 +109,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  List<String> get _currentDistricts => _selectedCity == null ? [] : List<String>.from(_districtsMap[_selectedCity] ?? []);
-  List<String> get _currentFields => (_selectedExam == null || !_examMatrixMap.containsKey(_selectedExam)) ? [] : List<String>.from(_examMatrixMap[_selectedExam]['fields'] ?? []);
+  String? _cleanValue(dynamic value) {
+    if (value == null) return null;
+    final cleaned = value.toString().trim();
+    return cleaned.isEmpty ? null : cleaned;
+  }
+
+  List<String> _toCleanStringList(dynamic raw) {
+    if (raw == null) return <String>[];
+    if (raw is List) {
+      return raw
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+
+    final cleaned = raw.toString().trim();
+    if (cleaned.isEmpty) return <String>[];
+    return [cleaned];
+  }
+
+  List<String> get _currentDistricts =>
+      _selectedCity == null ? [] : List<String>.from(_districtsMap[_selectedCity] ?? []);
+  List<String> get _currentFields =>
+      _selectedExam == null ? [] : List<String>.from(_examMatrixMap[_selectedExam] ?? []);
+
+  List<String> get _filteredExams {
+    if (_selectedEducationLevel == null) return _exams;
+    final lvl = _selectedEducationLevel!.toLowerCase();
+    if (lvl.contains('8')) return _exams.where((e) => e == 'LGS').toList();
+    if (lvl.contains('9') ||
+        lvl.contains('10') ||
+        lvl.contains('11') ||
+        lvl.contains('12') ||
+        lvl.contains('mezun')) {
+      return _exams.where((e) => e == 'YKS').toList();
+    }
+    return _exams;
+  }
 
   // Form Elemanı Yardımcı Metodu (Filtreleme ve İpucu (Hint) Özelliği Eklendi)
   Widget _buildTextField(String label, TextEditingController controller, {TextInputType type = TextInputType.text, List<TextInputFormatter>? formatters, String? hint}) {
@@ -108,17 +175,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator(color: Colors.blueAccent));
-
     return Scaffold(
       appBar: AppBar(title: const Text('Profil Kartım'), centerTitle: true),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.blueAccent))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
               _buildSectionTitle('Kişisel ve İletişim Bilgileri'),
               _buildTextField('Ad Soyad', _nameController, hint: 'Örn: Ahmet Yılmaz'),
               
@@ -159,23 +226,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 decoration: const InputDecoration(labelText: 'Öğrenim Durumu', border: OutlineInputBorder()),
                 value: _selectedEducationLevel,
                 items: _educationLevels.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
-                onChanged: (val) => setState(() => _selectedEducationLevel = val),
+                onChanged: (val) => setState(() {
+                  _selectedEducationLevel = val;
+                  _selectedExam = null;
+                  _selectedField = null;
+                }),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'Hedef Sınav', border: OutlineInputBorder()),
                 value: _selectedExam,
-                items: _exams.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                items: _filteredExams.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
                 onChanged: (val) => setState(() { _selectedExam = val; _selectedField = null; }),
               ),
               const SizedBox(height: 16),
-              if (_currentFields.isNotEmpty && _currentFields.first != 'Alan Yok')
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: 'Alanınız (Bölüm)', border: OutlineInputBorder()),
-                  value: _selectedField,
-                  items: _currentFields.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
-                  onChanged: (val) => setState(() => _selectedField = val),
-                ),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(labelText: 'Alanınız (Bölüm)', border: OutlineInputBorder()),
+                value: _selectedField,
+                items: _currentFields.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
+                onChanged: _selectedExam == null ? null : (val) => setState(() => _selectedField = val),
+                disabledHint: const Text('Önce Hedef Sınav Seçiniz'),
+              ),
 
               const Divider(height: 48, thickness: 1),
               _buildSectionTitle('Hedef ve Başlangıç Verileri'),
@@ -208,9 +279,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 32),
             ],
-          ),
-        ),
-      ),
+                ),
+              ),
+            ),
     );
   }
 }

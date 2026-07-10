@@ -41,46 +41,44 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDXthvUyjz4eJT8vGu_GktH-TwgfZLGK0I',
-    appId: '1:745081783885:web:63d343fc29650106b77e04',
-    messagingSenderId: '745081783885',
-    projectId: 'dstek-f4235',
-    authDomain: 'dstek-f4235.firebaseapp.com',
-    storageBucket: 'dstek-f4235.firebasestorage.app',
+    apiKey: 'AIzaSyDwdMlgt955IHN2uXugjMuOmepoxtxE-GE',
+    appId: '1:179711535828:web:96a0a6fefeb73caf5ae941',
+    messagingSenderId: '179711535828',
+    projectId: 'dstek-test',
+    authDomain: 'dstek-test.firebaseapp.com',
+    storageBucket: 'dstek-test.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCBltZcS86YvQx-7TE3g589GwuaENLkSLc',
-    appId: '1:745081783885:android:3822184168a44317b77e04',
-    messagingSenderId: '745081783885',
-    projectId: 'dstek-f4235',
-    storageBucket: 'dstek-f4235.firebasestorage.app',
+    apiKey: 'AIzaSyCvjadD0YW17Q3nfRwzSoQtBxLzBzgpbAw',
+    appId: '1:179711535828:android:6139438c264d96d85ae941',
+    messagingSenderId: '179711535828',
+    projectId: 'dstek-test',
+    storageBucket: 'dstek-test.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyD7aj_hCdtzGl-Vjf4GWm5gEtF8nTvTn3U',
-    appId: '1:745081783885:ios:0feb326e9e35bce9b77e04',
-    messagingSenderId: '745081783885',
-    projectId: 'dstek-f4235',
-    storageBucket: 'dstek-f4235.firebasestorage.app',
+    apiKey: 'AIzaSyA1jBhb4x1_pXOS5wpJfiuIoeYHZ23n9dc',
+    appId: '1:179711535828:ios:02b92cd76b4560d85ae941',
+    messagingSenderId: '179711535828',
+    projectId: 'dstek-test',
+    storageBucket: 'dstek-test.firebasestorage.app',
     iosBundleId: 'com.example.dstek',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyD7aj_hCdtzGl-Vjf4GWm5gEtF8nTvTn3U',
-    appId: '1:745081783885:ios:0feb326e9e35bce9b77e04',
-    messagingSenderId: '745081783885',
-    projectId: 'dstek-f4235',
-    storageBucket: 'dstek-f4235.firebasestorage.app',
+    apiKey: 'AIzaSyA1jBhb4x1_pXOS5wpJfiuIoeYHZ23n9dc',
+    appId: '1:179711535828:ios:02b92cd76b4560d85ae941',
+    messagingSenderId: '179711535828',
+    projectId: 'dstek-test',
+    storageBucket: 'dstek-test.firebasestorage.app',
     iosBundleId: 'com.example.dstek',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDXthvUyjz4eJT8vGu_GktH-TwgfZLGK0I',
-    appId: '1:745081783885:web:aa0735f513232052b77e04',
-    messagingSenderId: '745081783885',
-    projectId: 'dstek-f4235',
-    authDomain: 'dstek-f4235.firebaseapp.com',
-    storageBucket: 'dstek-f4235.firebasestorage.app',
+    apiKey: 'AIzaSyDwdMlgt955IHN2uXugjMuOmepoxtxE-GE',
+    appId: '1:179711535828:web:d0c3689c6edfe5925ae941',
+    messagingSenderId: '179711535828',
+    projectId: 'dstek-test',
+    authDomain: 'dstek-test.firebaseapp.com',
+    storageBucket: 'dstek-test.firebasestorage.app',
   );
 }
