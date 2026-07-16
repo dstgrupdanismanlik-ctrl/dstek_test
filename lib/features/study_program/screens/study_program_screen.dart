@@ -65,11 +65,11 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
   }
 
   void _showHolidaySelectionDialog(BuildContext context, StudyProgramProvider provider) {
-    List<bool> selectedHolidays = [false, false, false, false, false, false, true];
+    List<bool> selectedHolidays = List.from(provider.holidayPreferences);
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
@@ -89,19 +89,34 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
               actions: [
                 ElevatedButton(
                   onPressed: () {
-                    List<int> activeDays = [];
-                    for (int i = 0; i < 7; i++) {
+                    final activeDays = <int>[];
+                    for (int i = 0; i < selectedHolidays.length; i++) {
                       if (!selectedHolidays[i]) activeDays.add(i);
                     }
 
+                    final totalScheduledHours = provider.basketSubjects.fold<int>(0, (sum, item) => sum + item.estimatedStudyHours) +
+                                                provider.activeProgramSubjects.fold<int>(0, (sum, item) => sum + item.estimatedStudyHours);
+
+                    final absoluteMax = activeDays.length * 12;
+
+                    if (totalScheduledHours > absoluteMax) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('⛔ KAPASİTE AŞIMI! ${activeDays.length} aktif gün için mutlak sınır $absoluteMax saattir. Sepetinizde $totalScheduledHours saatlik yük var. Lütfen tatil günlerini azaltın veya sepeti hafifletin.'),
+                          backgroundColor: Colors.red,
+                          duration: const Duration(seconds: 5),
+                        ),
+                      );
+                      return; // Dağıtımı iptal eder, ekranda kalır
+                    }
+
+                    // Tercihleri hafızaya kaydet
+                    provider.holidayPreferences = List.from(selectedHolidays);
+
+                    Navigator.of(dialogContext).pop();
+                    provider.setActiveDayCount(activeDays.length);
                     provider.distributeProgram(activeDays);
-
-                    Navigator.pop(context);
                     _tabController.animateTo(1);
-
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      const SnackBar(content: Text('Program başarıyla takvime dağıtıldı!')),
-                    );
                   },
                   child: const Text('Dağıt'),
                 ),
@@ -228,15 +243,29 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
                 ],
               ),
               const SizedBox(height: 8),
-              provider.remainingHours < 0
-                  ? Text(
+              Builder(
+                builder: (context) {
+                  final currentTotalHours = provider.weeklyBudgetHours - provider.remainingHours;
+                  final absoluteMaxHours = provider.activeDayCount * 12;
+
+                  if (currentTotalHours >= absoluteMaxHours) {
+                    return const Text(
+                      '⛔ KAPASİTE DOLDU! Günde ortalama 12 saatlik mutlak sınırı doldurdun, programa daha fazla konu seçemezsin.',
+                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13),
+                    );
+                  } else if (provider.remainingHours < 0) {
+                    return Text(
                       '⚠️ Haftalık ${-(provider.remainingHours)} saat fazladan konu çalışması koydun programa, bu seni zorlar.',
                       style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13),
-                    )
-                  : Text(
+                    );
+                  } else {
+                    return Text(
                       'Kalan süre: ${provider.remainingHours} saat',
                       style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                    ),
+                    );
+                  }
+                },
+              ),
             ],
           ),
         ),
@@ -378,7 +407,7 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: List.generate(7, (dayIndex) {
             final loopDay = currentWeekStart.add(Duration(days: dayIndex));
-            final dayTasks = provider.activeProgramSubjects.where((item) => item.assignedDayIndex == dayIndex).toList();
+            final dayTasks = provider.activeProgramSubjects.where((item) => item.assignedDays.contains(dayIndex)).toList();
 
             return Expanded(
               child: Container(
@@ -424,7 +453,7 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
   }
 
   Widget _buildDailyDetailedView(StudyProgramProvider provider) {
-    final dayTasks = provider.activeProgramSubjects.where((item) => item.assignedDayIndex == selectedDayIndex).toList();
+    final dayTasks = provider.activeProgramSubjects.where((item) => item.assignedDays.contains(selectedDayIndex)).toList();
 
     return Expanded(
       child: Column(

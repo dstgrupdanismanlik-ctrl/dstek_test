@@ -10,6 +10,7 @@ class StudyProgramProvider extends ChangeNotifier {
   final List<StudySubject> _subjects = [];
   final List<StudySubject> _basketSubjects = [];
   final List<StudySubject> _activeProgramSubjects = []; 
+  List<bool> holidayPreferences = [false, false, false, false, false, false, true];
 
   final List<String> _columnOrder = [
     'column-1',
@@ -70,6 +71,7 @@ class StudyProgramProvider extends ChangeNotifier {
         final String konuAdi = data['konu_adi']?.toString() ?? 'İsimsiz Konu';
         final String dersAdi = data['ders_adi']?.toString() ?? 'Bilinmeyen Ders';
         final int saat = int.tryParse(data['tahmini_calisma_saati']?.toString() ?? '4') ?? 4;
+        final int onerilenGun = int.tryParse(data['onerilen_gun_sayisi']?.toString().trim() ?? '1') ?? 1;
         final int sira = int.tryParse(data['program_sirasi']?.toString().trim() ?? '9999') ?? 9999;
 
         if (data['is_active'] == true || data['is_active'] == 'TRUE') {
@@ -79,6 +81,7 @@ class StudyProgramProvider extends ChangeNotifier {
             opticalSuccess: 0.0,
             manualSuccess: 0.0,
             estimatedStudyHours: saat,
+            recommendedDays: onerilenGun,
             courseName: dersAdi,
             programOrder: sira,
             columnId: 'column-1',
@@ -148,6 +151,17 @@ class StudyProgramProvider extends ChangeNotifier {
     if (!_subjects.contains(subject)) return false;
 
     int requiredHours = subject.estimatedStudyHours;
+
+    // BAŞ MİMAR KURALI: Mutlak Kapasite Reddi (Günde max 10 saat + 2 saat ısrar payı)
+    int absoluteMaxHours = _activeDayCount * 12;
+    int currentTotalHours = weeklyBudgetHours - _remainingHours;
+
+    if ((currentTotalHours + requiredHours) > absoluteMaxHours) {
+      _lastMessage = 'KAPASİTE DOLDU! Günde ortalama 12 saati aşamazsınız. Daha fazla konu eklenemez.';
+      notifyListeners();
+      return false; // Sistemi kilitler ve konuyu sepete atmaz
+    }
+
     _remainingHours -= requiredHours;
     _isOverBudget = _remainingHours < 0;
 
@@ -174,7 +188,7 @@ class StudyProgramProvider extends ChangeNotifier {
 
   void removeFromProgram(StudySubject item) {
     _activeProgramSubjects.remove(item);
-    item.assignedDayIndex = null;
+    item.assignedDays = [];
     item.isCompleted = false;
     _subjects.add(item); 
     
@@ -187,7 +201,7 @@ class StudyProgramProvider extends ChangeNotifier {
   }
 
   void changeSubjectDay(StudySubject item, int newDayIndex) {
-    item.assignedDayIndex = newDayIndex;
+    item.assignedDays = [newDayIndex];
     notifyListeners();
   }
 
@@ -197,10 +211,17 @@ class StudyProgramProvider extends ChangeNotifier {
     // Hem eski programı hem sepettekileri birleştirip yepyeni bir dağıtım yapıyoruz
     final allToDistribute = [..._activeProgramSubjects, ..._basketSubjects];
 
-    int dayIndex = 0;
+    int dayPointer = 0;
     for (var subject in allToDistribute) {
-      subject.assignedDayIndex = activeDays[dayIndex % activeDays.length];
-      dayIndex++;
+      subject.assignedDays = [];
+      int daysNeeded = subject.recommendedDays;
+      if (daysNeeded > activeDays.length) daysNeeded = activeDays.length;
+      if (daysNeeded < 1) daysNeeded = 1;
+
+      for (int i = 0; i < daysNeeded; i++) {
+        subject.assignedDays.add(activeDays[(dayPointer + i) % activeDays.length]);
+      }
+      dayPointer = (dayPointer + daysNeeded) % activeDays.length;
     }
 
     _activeProgramSubjects.clear();

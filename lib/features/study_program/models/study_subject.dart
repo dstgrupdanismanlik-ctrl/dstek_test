@@ -7,11 +7,11 @@ class StudySubject {
     required this.opticalSuccess,
     required this.manualSuccess,
     required this.estimatedStudyHours,
+    required this.recommendedDays,
     this.lastTestScore,
     this.placementCount = 0,
     this.columnId = 'column-1',
     this.isCompleted = false,
-    this.assignedDayIndex, // YENİ EKLENEN: Takvimde hangi günde olduğunu hatırlar
   });
 
   final String id;
@@ -21,11 +21,12 @@ class StudySubject {
   final double opticalSuccess;
   final double manualSuccess;
   final int estimatedStudyHours;
+  final int recommendedDays;
   final double? lastTestScore;
   int placementCount;
   String columnId;
   bool isCompleted;
-  int? assignedDayIndex; // YENİ EKLENEN
+  List<int> assignedDays = [];
 
   double get safeScore => ((opticalSuccess * 0.70) + (manualSuccess * 0.30));
 

@@ -34,6 +34,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, List<String>> _districtsMap = {};
   List<String> _educationLevels = [];
   List<String> _exams = [];
+  Map<String, List<String>> _examValidLevels = {};
   Map<String, List<String>> _examMatrixMap = {
     'YKS': ['Sayısal', 'Eşit Ağırlık', 'Sözel', 'Dil', 'TYT (Sadece)'],
     'LGS': ['Genel'],
@@ -92,7 +93,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
 
         educationSet.addAll(_toCleanStringList(data['ogrenim_durumlari']));
-        examSet.addAll(_toCleanStringList(data['sinav_turleri']));
+        final currentExams = _toCleanStringList(data['sinav_turleri']);
+        examSet.addAll(currentExams);
+
+        final rawValidLevels = data['gecerli_ogrenim_durumlari']?.toString() ?? '';
+        final parsedLevels = rawValidLevels.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+
+        for (final exam in currentExams) {
+          if (parsedLevels.isNotEmpty) {
+            _examValidLevels[exam] = parsedLevels;
+          }
+        }
       }
 
       _cities = citySet.toList()..sort();
@@ -136,16 +147,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   List<String> get _filteredExams {
     if (_selectedEducationLevel == null) return _exams;
-    final lvl = _selectedEducationLevel!.toLowerCase();
-    if (lvl.contains('8')) return _exams.where((e) => e == 'LGS').toList();
-    if (lvl.contains('9') ||
-        lvl.contains('10') ||
-        lvl.contains('11') ||
-        lvl.contains('12') ||
-        lvl.contains('mezun')) {
-      return _exams.where((e) => e == 'YKS').toList();
-    }
-    return _exams;
+    return _exams.where((exam) {
+      final validLevels = _examValidLevels[exam];
+      // Eğer veritabanında bu sınav için bir kısıtlama girilmemişse her durumda göster, girilmişse eşleşmeyi bekle
+      if (validLevels == null || validLevels.isEmpty) return true;
+      return validLevels.contains(_selectedEducationLevel);
+    }).toList();
   }
 
   // Form Elemanı Yardımcı Metodu (Filtreleme ve İpucu (Hint) Özelliği Eklendi)

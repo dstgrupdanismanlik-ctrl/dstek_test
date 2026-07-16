@@ -13,11 +13,131 @@ class AdminSettingsScreen extends StatefulWidget {
   State<AdminSettingsScreen> createState() => _AdminSettingsScreenState();
 }
 
+enum _SyncTable {
+  curriculum,
+  generalDefinitions,
+  systemConstants,
+  opticTests,
+  opticPracticeExams,
+}
+
 class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isLoading = false;
   bool _isDeleting = false;
   String _activeTableLabel = '';
+
+  String _syncTableLabel(_SyncTable table) {
+    switch (table) {
+      case _SyncTable.curriculum:
+        return 'YKS Dersleri ve Araclari (curriculum)';
+      case _SyncTable.generalDefinitions:
+        return 'Genel Tanim Tablosu (general_definitions)';
+      case _SyncTable.systemConstants:
+        return 'Sistem Sabitleri (system_constants)';
+      case _SyncTable.opticTests:
+        return 'YKS Optikli Testler';
+      case _SyncTable.opticPracticeExams:
+        return 'YKS Optikli Denemeler';
+    }
+  }
+
+  Future<void> _showTableSelectionDialog() async {
+    final selectedTables = <_SyncTable>{};
+
+    final result = await showDialog<Set<_SyncTable>>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            void onToggle(_SyncTable table, bool isSelected) {
+              setDialogState(() {
+                if (isSelected) {
+                  selectedTables.add(table);
+                } else {
+                  selectedTables.remove(table);
+                }
+              });
+            }
+
+            return AlertDialog(
+              title: const Text('Guncellenecek Tablolari Secin'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: selectedTables.contains(_SyncTable.curriculum),
+                      onChanged: (value) =>
+                          onToggle(_SyncTable.curriculum, value ?? false),
+                      title: Text(_syncTableLabel(_SyncTable.curriculum)),
+                    ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: selectedTables.contains(
+                        _SyncTable.generalDefinitions,
+                      ),
+                      onChanged: (value) => onToggle(
+                        _SyncTable.generalDefinitions,
+                        value ?? false,
+                      ),
+                      title: Text(
+                        _syncTableLabel(_SyncTable.generalDefinitions),
+                      ),
+                    ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: selectedTables.contains(
+                        _SyncTable.systemConstants,
+                      ),
+                      onChanged: (value) =>
+                          onToggle(_SyncTable.systemConstants, value ?? false),
+                      title: Text(_syncTableLabel(_SyncTable.systemConstants)),
+                    ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: selectedTables.contains(_SyncTable.opticTests),
+                      onChanged: (value) =>
+                          onToggle(_SyncTable.opticTests, value ?? false),
+                      title: Text(_syncTableLabel(_SyncTable.opticTests)),
+                    ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: selectedTables.contains(_SyncTable.opticPracticeExams),
+                      onChanged: (value) =>
+                          onToggle(_SyncTable.opticPracticeExams, value ?? false),
+                      title: Text(_syncTableLabel(_SyncTable.opticPracticeExams)),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Vazgec'),
+                ),
+                ElevatedButton(
+                  onPressed: selectedTables.isEmpty
+                      ? null
+                      : () => Navigator.of(
+                            dialogContext,
+                          ).pop(Set<_SyncTable>.from(selectedTables)),
+                  child: const Text('Guncelle'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (!mounted || result == null || result.isEmpty) {
+      return;
+    }
+
+    await _syncDatabase(result);
+  }
 
   Future<int> _upsertTableData({
     required FirebaseFirestore firestore,
@@ -115,7 +235,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         return AlertDialog(
           title: const Text('Emin misiniz?'),
           content: const Text(
-            'Bu işlem curriculum, general_definitions ve system_constants koleksiyonlarındaki tüm verileri silecektir.',
+            'Bu işlem curriculum, general_definitions, system_constants, yks_optikli_test ve yks_optikli_deneme koleksiyonlarındaki tüm verileri silecektir.',
           ),
           actions: [
             TextButton(
@@ -144,6 +264,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       await _clearCollection('curriculum');
       await _clearCollection('general_definitions');
       await _clearCollection('system_constants');
+      await _clearCollection('yks_optikli_test');
+      await _clearCollection('yks_optikli_deneme');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -169,7 +291,11 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     }
   }
 
-  Future<void> _syncDatabase() async {
+  Future<void> _syncDatabase(Set<_SyncTable> selectedTables) async {
+    if (selectedTables.isEmpty) {
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -179,7 +305,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body) as Map<String, dynamic>;
+        final Map<String, dynamic> data =
+            json.decode(response.body) as Map<String, dynamic>;
         var totalCount = 0;
 
         String _normalize(String value) {
@@ -199,37 +326,77 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         }
 
         final yksKey = _findPayloadKey(['yks', 'dersler', 'yks dersleri']);
-        final t1Key = _findPayloadKey(['t-1', 't 1', 'tanim', 'genel tanimlar']);
-        final sabitlerKey = _findPayloadKey(['tablo9', 'tablo 9', 'sabitler', 'sistem sabitleri']);
+        final t1Key = _findPayloadKey([
+          't-1',
+          't 1',
+          'tanim',
+          'genel tanimlar',
+        ]);
+        final sabitlerKey = _findPayloadKey([
+          'tablo9',
+          'tablo 9',
+          'sabitler',
+          'sistem sabitleri',
+        ]);
+        final optikTestKey = data.containsKey('YKS OPTİKLİ TEST') ? 'YKS OPTİKLİ TEST' : null;
+        final optikDenemeKey = data.containsKey('YKS OPTİKLİ DENEME') ? 'YKS OPTİKLİ DENEME' : null;
 
-        totalCount += await _upsertTableData(
-          firestore: _firestore,
-          payloadKey: yksKey ?? 'yks_dersleri',
-          collectionName: 'curriculum',
-          docKeyCandidates: const ['konu_kodu', 'id', 'kod'],
-          payload: yksKey == null ? null : data[yksKey],
-        );
+        if (selectedTables.contains(_SyncTable.curriculum)) {
+          totalCount += await _upsertTableData(
+            firestore: _firestore,
+            payloadKey: yksKey ?? 'yks_dersleri',
+            collectionName: 'curriculum',
+            docKeyCandidates: const ['konu_kodu', 'id', 'kod'],
+            payload: yksKey == null ? null : data[yksKey],
+          );
+        }
 
-        totalCount += await _upsertTableData(
-          firestore: _firestore,
-          payloadKey: t1Key ?? 'genel_tanimlar',
-          collectionName: 'general_definitions',
-          docKeyCandidates: const ['id', 'tanim_kodu', 'kod', 'key'],
-          payload: t1Key == null ? null : data[t1Key],
-        );
+        if (selectedTables.contains(_SyncTable.generalDefinitions)) {
+          totalCount += await _upsertTableData(
+            firestore: _firestore,
+            payloadKey: t1Key ?? 'genel_tanimlar',
+            collectionName: 'general_definitions',
+            docKeyCandidates: const ['id', 'tanim_kodu', 'kod', 'key'],
+            payload: t1Key == null ? null : data[t1Key],
+          );
+        }
 
-        totalCount += await _upsertTableData(
-          firestore: _firestore,
-          payloadKey: sabitlerKey ?? 'sistem_sabitleri',
-          collectionName: 'system_constants',
-          docKeyCandidates: const ['id', 'sabit_kodu', 'kod', 'key'],
-          payload: sabitlerKey == null ? null : data[sabitlerKey],
-        );
+        if (selectedTables.contains(_SyncTable.systemConstants)) {
+          totalCount += await _upsertTableData(
+            firestore: _firestore,
+            payloadKey: sabitlerKey ?? 'sistem_sabitleri',
+            collectionName: 'system_constants',
+            docKeyCandidates: const ['id', 'sabit_kodu', 'kod', 'key'],
+            payload: sabitlerKey == null ? null : data[sabitlerKey],
+          );
+        }
+
+        if (selectedTables.contains(_SyncTable.opticTests)) {
+          totalCount += await _upsertTableData(
+            firestore: _firestore,
+            payloadKey: optikTestKey ?? 'yks_optikli_test',
+            collectionName: 'yks_optikli_test',
+            docKeyCandidates: const ['test_adi', 'id', 'test_kodu'],
+            payload: optikTestKey == null ? null : data[optikTestKey],
+          );
+        }
+
+        if (selectedTables.contains(_SyncTable.opticPracticeExams)) {
+          totalCount += await _upsertTableData(
+            firestore: _firestore,
+            payloadKey: optikDenemeKey ?? 'yks_optikli_deneme',
+            collectionName: 'yks_optikli_deneme',
+            docKeyCandidates: const ['deneme_adi', 'id', 'deneme_kodu'],
+            payload: optikDenemeKey == null ? null : data[optikDenemeKey],
+          );
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Toplam $totalCount kayit Firestore\'a aktarildi/guncellendi!'),
+              content: Text(
+                'Toplam $totalCount kayit secilen tablolardan Firestore\'a aktarildi/guncellendi!',
+              ),
               backgroundColor: Colors.green,
             ),
           );
@@ -259,9 +426,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sistem Kurulumu (Admin)'),
-      ),
+      appBar: AppBar(title: const Text('Sistem Kurulumu (Admin)')),
       drawer: const AppDrawer(),
       body: Center(
         child: Padding(
@@ -293,7 +458,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                 ),
               ] else ...[
                 ElevatedButton.icon(
-                  onPressed: _isDeleting ? null : _syncDatabase,
+                  onPressed: _isDeleting ? null : _showTableSelectionDialog,
                   icon: const Icon(Icons.cloud_sync),
                   label: const Text('SISTEMI KUR (EXCEL GUNCELLE)'),
                   style: ElevatedButton.styleFrom(

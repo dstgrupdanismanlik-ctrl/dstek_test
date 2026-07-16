@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dstek/shared/widgets/app_drawer.dart';
 
 // ==========================================
@@ -198,6 +199,28 @@ class OpticTestData {
     required this.testAdi,
     required this.answers,
   });
+
+  factory OpticTestData.fromMap(Map<String, dynamic> map) {
+    List<String> extractedAnswers = [];
+    // Tablodaki '1', '2', '3' ... '120' arasi sutun basliklarini tarar
+    for (int i = 1; i <= 120; i++) {
+      final val = map[i.toString()]?.toString().trim();
+      if (val != null && val.isNotEmpty) {
+        extractedAnswers.add(val);
+      } else {
+        break; // Bos hucre gorunce (sorular bitince) donguyu kirar
+      }
+    }
+
+    return OpticTestData(
+      testTuru: map['test_turu']?.toString() ?? '',
+      yayinAdi: map['yayin_adi']?.toString() ?? '',
+      seri: map['seri']?.toString() ?? '',
+      konuKoduAdi: map['konu_kodu_adi']?.toString() ?? '',
+      testAdi: map['test_adi']?.toString() ?? '',
+      answers: extractedAnswers,
+    );
+  }
 }
 
 class OpticTestTab extends StatefulWidget {
@@ -208,60 +231,67 @@ class OpticTestTab extends StatefulWidget {
 }
 
 class _OpticTestTabState extends State<OpticTestTab> {
+  static const String _testCollectionName = '[TEST_KOLEKSIYON_ADI]';
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String? _selectedTestTuru;
   String? _selectedYayinAdi;
   String? _selectedSeri;
   String? _selectedKonuKoduAdi;
   String? _selectedTestAdi;
   OpticTestData? _selectedTest;
+  List<OpticTestData> _testList = [];
   List<String?> _selectedAnswers = [];
+  bool _isLoading = true;
   bool isChecked = false;
   int correctCount = 0;
   int wrongCount = 0;
   int emptyCount = 0;
 
-  static const List<OpticTestData> _mockTests = [
-    OpticTestData(
-      testTuru: 'Kağıt Test',
-      yayinAdi: 'EİS',
-      seri: 'Beyaz',
-      konuKoduAdi: 'T_TR_3 Paragraf',
-      testAdi: 'K_EİS_B_T_TR_3_005',
-      answers: ['A', 'C', 'B', 'D', 'E', 'A', 'C', 'B', 'E', 'D', 'A', 'B', 'C', 'D', 'E', 'A', 'B', 'C', 'D', 'E'],
-    ),
-    OpticTestData(
-      testTuru: 'Kağıt Test',
-      yayinAdi: 'EİS',
-      seri: 'Siyah',
-      konuKoduAdi: 'T_TR_1 Dil Bilgisi',
-      testAdi: 'K_EİS_S_T_TR_1_001',
-      answers: ['B', 'A', 'E', 'C', 'D', 'A', 'B', 'E', 'C', 'D', 'A', 'B', 'C', 'D', 'E'],
-    ),
-    OpticTestData(
-      testTuru: 'Online Test',
-      yayinAdi: 'NET',
-      seri: 'Lacivert',
-      konuKoduAdi: 'M_AT_2 Analiz',
-      testAdi: 'O_NET_L_M_AT_2_010',
-      answers: ['C', 'D', 'A', 'B', 'E', 'C', 'D', 'A', 'B', 'E', 'C', 'A', 'D', 'B', 'E', 'C', 'A', 'D', 'B', 'E', 'C', 'A', 'D', 'B', 'E'],
-    ),
-    OpticTestData(
-      testTuru: 'Online Test',
-      yayinAdi: 'NET',
-      seri: 'Gri',
-      konuKoduAdi: 'FEN_1 Fizik',
-      testAdi: 'O_NET_G_FEN_1_002',
-      answers: ['D', 'B', 'C', 'A', 'E', 'B', 'C', 'A', 'D', 'E'],
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadTests();
+  }
+
+  Future<void> _loadTests() async {
+    try {
+      final snapshot = await _firestore.collection('yks_optikli_test').get();
+      final loadedTests = snapshot.docs.map((doc) {
+        final data = doc.data();
+        final parsed = OpticTestData.fromMap(data);
+        return OpticTestData(
+          testTuru: parsed.testTuru,
+          yayinAdi: parsed.yayinAdi,
+          seri: parsed.seri,
+          konuKoduAdi: parsed.konuKoduAdi,
+          testAdi: parsed.testAdi.isEmpty ? doc.id : parsed.testAdi,
+          answers: parsed.answers,
+        );
+      }).where((e) => e.testAdi.isNotEmpty).toList();
+
+      if (mounted) {
+        setState(() {
+          _testList = loadedTests;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Testler yuklenemedi: $e')),
+        );
+      }
+    }
+  }
 
   List<String> get _testTurleri {
-    return _mockTests.map((e) => e.testTuru).toSet().toList();
+    return _testList.map((e) => e.testTuru).toSet().toList();
   }
 
   List<String> get _yayinAdlari {
     if (_selectedTestTuru == null) return [];
-    return _mockTests
+    return _testList
         .where((e) => e.testTuru == _selectedTestTuru)
         .map((e) => e.yayinAdi)
         .toSet()
@@ -270,7 +300,7 @@ class _OpticTestTabState extends State<OpticTestTab> {
 
   List<String> get _seriListesi {
     if (_selectedTestTuru == null || _selectedYayinAdi == null) return [];
-    return _mockTests
+    return _testList
         .where((e) => e.testTuru == _selectedTestTuru && e.yayinAdi == _selectedYayinAdi)
         .map((e) => e.seri)
         .toSet()
@@ -279,7 +309,7 @@ class _OpticTestTabState extends State<OpticTestTab> {
 
   List<String> get _konuKodlari {
     if (_selectedTestTuru == null || _selectedYayinAdi == null || _selectedSeri == null) return [];
-    return _mockTests
+    return _testList
         .where((e) => e.testTuru == _selectedTestTuru && e.yayinAdi == _selectedYayinAdi && e.seri == _selectedSeri)
         .map((e) => e.konuKoduAdi)
         .toSet()
@@ -288,7 +318,7 @@ class _OpticTestTabState extends State<OpticTestTab> {
 
   List<String> get _testAdlari {
     if (_selectedTestTuru == null || _selectedYayinAdi == null || _selectedSeri == null || _selectedKonuKoduAdi == null) return [];
-    return _mockTests
+    return _testList
         .where((e) => e.testTuru == _selectedTestTuru && e.yayinAdi == _selectedYayinAdi && e.seri == _selectedSeri && e.konuKoduAdi == _selectedKonuKoduAdi)
         .map((e) => e.testAdi)
         .toSet()
@@ -337,7 +367,7 @@ class _OpticTestTabState extends State<OpticTestTab> {
       return;
     }
 
-    final found = _mockTests.where((e) => e.testAdi == value).toList();
+    final found = _testList.where((e) => e.testAdi == value).toList();
     _selectedTest = found.isNotEmpty ? found.first : null;
     _selectedAnswers = List<String?>.filled(_selectedTest?.answers.length ?? 0, null);
   }
@@ -417,6 +447,10 @@ class _OpticTestTabState extends State<OpticTestTab> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -767,6 +801,28 @@ class PracticeOpticExamData {
     required this.denemeAdi,
     required this.answers,
   });
+
+  factory PracticeOpticExamData.fromMap(Map<String, dynamic> map) {
+    List<String> extractedAnswers = [];
+    // Tablodaki 'c_1', 'c_2', 'c_3' ... 'c_120' arasi sutun basliklarini tarar
+    for (int i = 1; i <= 120; i++) {
+      final val = map['c_$i']?.toString().trim();
+      if (val != null && val.isNotEmpty) {
+        extractedAnswers.add(val);
+      } else {
+        break; // Sorular bitince durur
+      }
+    }
+
+    return PracticeOpticExamData(
+      altSinavTuru: map['alt_sinav_turu']?.toString() ?? '',
+      yayinAdi: map['yayin_adi']?.toString() ?? '',
+      seri: map['seri']?.toString() ?? '',
+      sayi: map['sayi']?.toString() ?? '',
+      denemeAdi: map['deneme_adi']?.toString() ?? '',
+      answers: extractedAnswers,
+    );
+  }
 }
 
 class PracticeOpticExamTab extends StatefulWidget {
@@ -777,50 +833,65 @@ class PracticeOpticExamTab extends StatefulWidget {
 }
 
 class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
+  static const String _denemeCollectionName = '[DENEME_KOLEKSIYON_ADI]';
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String? _selectedAltSinavTuru;
   String? _selectedYayinAdi;
   String? _selectedSeri;
   String? _selectedSayi;
   String? _selectedDenemeAdi;
   PracticeOpticExamData? _selectedDeneme;
+  List<PracticeOpticExamData> _denemeList = [];
   List<String?> _selectedAnswers = [];
+  bool _isLoading = true;
   bool isChecked = false;
   int correctCount = 0;
   int wrongCount = 0;
   int emptyCount = 0;
 
-  static const List<PracticeOpticExamData> _mockDenemeler = [
-    PracticeOpticExamData(
-      altSinavTuru: 'TYT',
-      yayinAdi: 'EŞS',
-      seri: 'BEYAZ 2026',
-      sayi: '1',
-      denemeAdi: '13_BEY26_TYT_01',
-      answers: ['A', 'B', 'C', 'D', 'E', 'A', 'C', 'D', 'B', 'E', 'A', 'C', 'B', 'D', 'E', 'A', 'B', 'C', 'D', 'E', 'A', 'C', 'B', 'D', 'E', 'A', 'B', 'C', 'D', 'E', 'A', 'B', 'C', 'D', 'E', 'A', 'C', 'B', 'D', 'E', 'A', 'B', 'C'],
-    ),
-    PracticeOpticExamData(
-      altSinavTuru: 'AYT',
-      yayinAdi: 'Bilgi Sarmal',
-      seri: 'PRO',
-      sayi: '2',
-      denemeAdi: 'BS_PRO_AYT_02',
-      answers: ['B', 'C', 'A', 'E', 'D', 'B', 'C', 'A', 'E', 'D', 'A', 'B', 'C', 'D', 'E', 'A', 'B', 'C', 'D', 'E', 'B', 'C', 'A', 'E', 'D', 'A', 'B', 'C', 'D', 'E'],
-    ),
-    PracticeOpticExamData(
-      altSinavTuru: 'TYT',
-      yayinAdi: 'Bilgi Sarmal',
-      seri: 'PRO',
-      sayi: '5',
-      denemeAdi: 'BS_PRO_TYT_05',
-      answers: ['E', 'D', 'C', 'B', 'A', 'E', 'D', 'C', 'B', 'A', 'E', 'D', 'C', 'B', 'A', 'E', 'D', 'C', 'B', 'A', 'E', 'D', 'C', 'B', 'A', 'E', 'D', 'C', 'B', 'A'],
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadDenemeler();
+  }
 
-  List<String> get _altSinavTurleri => _mockDenemeler.map((e) => e.altSinavTuru).toSet().toList();
+  Future<void> _loadDenemeler() async {
+    try {
+      final snapshot = await _firestore.collection('yks_optikli_deneme').get();
+      final loadedDenemeler = snapshot.docs.map((doc) {
+        final data = doc.data();
+        final parsed = PracticeOpticExamData.fromMap(data);
+        return PracticeOpticExamData(
+          altSinavTuru: parsed.altSinavTuru,
+          yayinAdi: parsed.yayinAdi,
+          seri: parsed.seri,
+          sayi: parsed.sayi,
+          denemeAdi: parsed.denemeAdi.isEmpty ? doc.id : parsed.denemeAdi,
+          answers: parsed.answers,
+        );
+      }).where((e) => e.denemeAdi.isNotEmpty).toList();
+
+      if (mounted) {
+        setState(() {
+          _denemeList = loadedDenemeler;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Denemeler yuklenemedi: $e')),
+        );
+      }
+    }
+  }
+
+  List<String> get _altSinavTurleri => _denemeList.map((e) => e.altSinavTuru).toSet().toList();
 
   List<String> get _yayinAdlari {
     if (_selectedAltSinavTuru == null) return [];
-    return _mockDenemeler
+    return _denemeList
         .where((e) => e.altSinavTuru == _selectedAltSinavTuru)
         .map((e) => e.yayinAdi)
         .toSet()
@@ -829,7 +900,7 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
 
   List<String> get _seriListesi {
     if (_selectedAltSinavTuru == null || _selectedYayinAdi == null) return [];
-    return _mockDenemeler
+    return _denemeList
         .where((e) => e.altSinavTuru == _selectedAltSinavTuru && e.yayinAdi == _selectedYayinAdi)
         .map((e) => e.seri)
         .toSet()
@@ -838,7 +909,7 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
 
   List<String> get _sayiListesi {
     if (_selectedAltSinavTuru == null || _selectedYayinAdi == null || _selectedSeri == null) return [];
-    return _mockDenemeler
+    return _denemeList
         .where((e) => e.altSinavTuru == _selectedAltSinavTuru && e.yayinAdi == _selectedYayinAdi && e.seri == _selectedSeri)
         .map((e) => e.sayi)
         .toSet()
@@ -847,7 +918,7 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
 
   List<String> get _denemeAdlari {
     if (_selectedAltSinavTuru == null || _selectedYayinAdi == null || _selectedSeri == null || _selectedSayi == null) return [];
-    return _mockDenemeler
+    return _denemeList
         .where((e) => e.altSinavTuru == _selectedAltSinavTuru && e.yayinAdi == _selectedYayinAdi && e.seri == _selectedSeri && e.sayi == _selectedSayi)
         .map((e) => e.denemeAdi)
         .toSet()
@@ -900,7 +971,7 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
       return;
     }
 
-    final found = _mockDenemeler.where((e) => e.denemeAdi == value).toList();
+    final found = _denemeList.where((e) => e.denemeAdi == value).toList();
     _selectedDeneme = found.isNotEmpty ? found.first : null;
     _selectedAnswers = List<String?>.filled(_selectedDeneme?.answers.length ?? 0, null);
     isChecked = false;
@@ -983,6 +1054,10 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),

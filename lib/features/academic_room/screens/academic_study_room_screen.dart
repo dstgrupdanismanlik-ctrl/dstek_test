@@ -213,8 +213,8 @@ class _AcademicStudyRoomScreenState extends State<AcademicStudyRoomScreen> {
     final tools = [
       _StudyTool(title: 'Google PDF', icon: Icons.picture_as_pdf, url: 'https://www.google.com/search?q=$query+filetype:pdf'),
       _StudyTool(title: 'Google Video', icon: Icons.ondemand_video, url: 'https://www.youtube.com/results?search_query=$query'),
-      _StudyTool(title: 'MEBİ / EBA PDF', icon: Icons.menu_book, url: 'https://www.google.com/search?q=$query+MEBİ+EBA+filetype:pdf'),
-      _StudyTool(title: 'MEBİ / EBA Video', icon: Icons.video_library, url: 'https://www.youtube.com/results?search_query=$query+MEBİ+EBA+Konu+Anlatımı'),
+      _StudyTool(title: 'MEBİ / EBA PDF', icon: Icons.menu_book, url: 'https://www.google.com/search?q=$query+site:gov.tr+filetype:pdf'),
+      _StudyTool(title: 'MEBİ / EBA Video', icon: Icons.video_library, url: 'https://www.google.com/search?q=$query+%22Ortaöğretim+Genel+Müdürlüğü%22+OR+%22TRT+EBA%22&tbm=vid'),
       _StudyTool(title: 'Kurumsal PDF', icon: Icons.description, url: topic.kurumsalPdfLink),
       _StudyTool(title: 'Kurumsal Video', icon: Icons.play_circle_outline, url: topic.kurumsalVideoLink),
       _StudyTool(title: 'Soru Bankası', icon: Icons.library_books, url: topic.soruBankasiLink),
