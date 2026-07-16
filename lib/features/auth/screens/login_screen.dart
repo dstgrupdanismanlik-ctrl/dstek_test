@@ -144,13 +144,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           // --- Kurum Kodu ---
                           TextFormField(
                             controller: _kurumKoduController,
+                            style: const TextStyle(fontSize: 16),
                             decoration: InputDecoration(
                               labelText: 'Kurum Kodu (Örn: 16GUR...)',
+                              labelStyle: const TextStyle(fontSize: 16),
+                              hintStyle: const TextStyle(fontSize: 16),
                               prefixIcon: const Icon(Icons.domain),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                             ),
                             validator: (value) =>
                                 value == null || value.isEmpty ? 'Kurum kodu boş bırakılamaz' : null,
@@ -161,13 +164,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextFormField(
                             controller: _identifierController,
                             keyboardType: TextInputType.emailAddress,
+                            style: const TextStyle(fontSize: 16),
                             decoration: InputDecoration(
                               labelText: _selectedRole == 'ogrenci' ? 'E-Posta / Öğrenci No' : 'E-Posta / Kullanıcı Adı',
+                              labelStyle: const TextStyle(fontSize: 16),
+                              hintStyle: const TextStyle(fontSize: 16),
                               prefixIcon: const Icon(Icons.person),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                             ),
                             validator: (value) =>
                                 value == null || value.isEmpty ? 'Bu alan boş bırakılamaz' : null,
@@ -178,8 +184,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _obscurePassword,
+                            style: const TextStyle(fontSize: 16),
                             decoration: InputDecoration(
                               labelText: 'Şifre',
+                              labelStyle: const TextStyle(fontSize: 16),
+                              hintStyle: const TextStyle(fontSize: 16),
                               prefixIcon: const Icon(Icons.lock),
                               suffixIcon: IconButton(
                                 icon: Icon(
@@ -195,7 +204,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                             ),
                             validator: (value) =>
                                 value == null || value.isEmpty ? 'Şifre boş bırakılamaz' : null,
@@ -272,6 +281,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF27AE60),
                                 foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -282,7 +292,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   : const Text(
                                       'Sistemi Başlat',
                                       style: TextStyle(
-                                        fontSize: 16,
+                                        fontSize: 18,
                                         fontWeight: FontWeight.bold,
                                         letterSpacing: 0.5,
                                       ),
@@ -324,7 +334,7 @@ class _LoginScreenState extends State<LoginScreen> {
             });
           },
         ),
-        Text(title, style: const TextStyle(fontSize: 14)),
+        Text(title, style: const TextStyle(fontSize: 16)),
       ],
     );
   }

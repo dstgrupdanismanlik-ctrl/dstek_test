@@ -107,7 +107,7 @@ DSTEK, LGS ve YKS gibi sınavlara hazırlık sürecinde seni takip eden akıllı
           // İçeriği sabit yükseklikli ve kaydırılabilir bir kutuya alıyoruz
           children: [
             Container(
-              height: 160, // Bütün açık kartların aynı ölçüde olmasını sağlayan sabit yükseklik
+              constraints: const BoxConstraints(maxHeight: 300),
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Scrollbar(
                 thumbVisibility: true,
@@ -119,7 +119,7 @@ DSTEK, LGS ve YKS gibi sınavlara hazırlık sürecinde seni takip eden akıllı
                       children: [
                         Text(
                           item.content,
-                          style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.5),
+                          style: TextStyle(fontSize: 16, color: Colors.grey.shade800, height: 1.5),
                         ),
                         if (item.isLink && item.url != null) ...[
                           const SizedBox(height: 16),
