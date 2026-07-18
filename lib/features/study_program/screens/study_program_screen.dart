@@ -4,6 +4,23 @@ import 'package:dstek/features/study_program/models/study_subject.dart';
 import 'package:dstek/features/study_program/providers/study_program_provider.dart';
 import 'package:dstek/shared/widgets/app_drawer.dart';
 
+class _PrerequisiteDialogResult {
+  const _PrerequisiteDialogResult({
+    this.addOnlyMainSubject = false,
+    this.selectedPrerequisites = const <StudySubject>[],
+  });
+
+  final bool addOnlyMainSubject;
+  final List<StudySubject> selectedPrerequisites;
+}
+
+enum _PrerequisiteLockMode {
+  unstudiedInfo,
+  hardLock,
+  softLock,
+  none,
+}
+
 class StudyProgramScreen extends StatefulWidget {
   const StudyProgramScreen({super.key});
 
@@ -26,10 +43,10 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
 
   final Map<String, Map<String, dynamic>> columnConfigs = {
     'column-1': {'title': 'Hiç Çalışılmamış', 'color': Colors.grey},
-    'column-2': {'title': '%70 Altı / Destek Al', 'color': Colors.orange},
-    'column-3': {'title': '%70-79 / Tekrar Et', 'color': Colors.blue},
-    'column-4': {'title': '%80-89 / Soru Çöz', 'color': Colors.green},
-    'column-5': {'title': '%90 Üzeri / Tamamlandı', 'color': Colors.purple},
+    'column-2': {'title': 'Destek Al', 'color': Colors.orange},
+    'column-3': {'title': 'Tekrar Et', 'color': Colors.blue},
+    'column-4': {'title': 'Soru Çöz', 'color': Colors.green},
+    'column-5': {'title': 'Tamamlandı', 'color': Colors.purple},
   };
 
   @override
@@ -74,17 +91,19 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
           builder: (context, setDialogState) {
             return AlertDialog(
               title: const Text('Tatil Günlerini Seçin'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: List.generate(7, (index) {
-                  return CheckboxListTile(
-                    title: Text(weekDaysTr[index]),
-                    value: selectedHolidays[index],
-                    onChanged: (val) {
-                      setDialogState(() => selectedHolidays[index] = val ?? false);
-                    },
-                  );
-                }),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(7, (index) {
+                    return CheckboxListTile(
+                      title: Text(weekDaysTr[index]),
+                      value: selectedHolidays[index],
+                      onChanged: (val) {
+                        setDialogState(() => selectedHolidays[index] = val ?? false);
+                      },
+                    );
+                  }),
+                ),
               ),
               actions: [
                 ElevatedButton(
@@ -94,8 +113,23 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
                       if (!selectedHolidays[i]) activeDays.add(i);
                     }
 
-                    final totalScheduledHours = provider.basketSubjects.fold<int>(0, (sum, item) => sum + item.estimatedStudyHours) +
-                                                provider.activeProgramSubjects.fold<int>(0, (sum, item) => sum + item.estimatedStudyHours);
+                    final basketHours = provider.basketSubjects.fold<int>(
+                      0,
+                      (sum, item) =>
+                          sum +
+                          provider
+                              .getEffectiveDuration(item, item.columnId)
+                              .round(),
+                    );
+                    final programHours = provider.activeProgramSubjects.fold<int>(
+                      0,
+                      (sum, item) =>
+                          sum +
+                          provider
+                              .getEffectiveDuration(item, item.columnId)
+                              .round(),
+                    );
+                    final totalScheduledHours = basketHours + programHours;
 
                     final absoluteMax = activeDays.length * 12;
 
@@ -128,11 +162,249 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
     );
   }
 
+  String _formatHours(double hours) {
+    if (hours == hours.roundToDouble()) {
+      return hours.toStringAsFixed(0);
+    }
+    return hours.toStringAsFixed(1);
+  }
+
+  _PrerequisiteLockMode _resolvePrerequisiteLockMode(StudySubject subject) {
+    final score = subject.safeScore;
+    if (score <= 0) {
+      return _PrerequisiteLockMode.unstudiedInfo;
+    }
+    if (score < 80) {
+      return _PrerequisiteLockMode.hardLock;
+    }
+    if (score < 90) {
+      return _PrerequisiteLockMode.softLock;
+    }
+    return _PrerequisiteLockMode.none;
+  }
+
+  Future<void> _handleAddToBasket(
+    StudySubject subject,
+    StudyProgramProvider provider,
+  ) async {
+    final item = subject;
+
+    if (item.columnId == 'column-2' && item.placementCount >= 3) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text(
+            '👨‍🏫 Öğretmen Desteği',
+            style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            '${item.name} konusunu daha önce çok kez programa aldın. Verim için öğretmenden destek alman önerilir.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                provider.sendToTeacher(item);
+              },
+              child: const Text('Öğretmenden Destek Alacağım'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _checkPrerequisitesAndAdd(item, provider);
+              },
+              child: const Text('Kendim Çalışacağım'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (item.columnId == 'column-5') {
+      int limit = provider.daysUntilExam > 120 ? 2 : 5;
+      if (provider.getCompletedSubjectCountInProgram() >= limit) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              provider.daysUntilExam > 120
+                  ? 'Sınava henüz çok vakit var. Bu sütundan haftada en fazla $limit tekrar konusu seçebilirsin.'
+                  : 'Genel tekrar dönemi limitine ulaştın. (Maks: $limit konu)',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+    }
+
+    await _checkPrerequisitesAndAdd(item, provider);
+  }
+
+  Future<void> _checkPrerequisitesAndAdd(
+    StudySubject item,
+    StudyProgramProvider provider,
+  ) async {
+    final eksikOnKosullar = provider.getMissingPrerequisites(item);
+    final lockMode = _resolvePrerequisiteLockMode(item);
+
+    if (eksikOnKosullar.isEmpty || lockMode == _PrerequisiteLockMode.none) {
+      provider.addSubjectToBasket(item);
+      return;
+    }
+
+    if (lockMode == _PrerequisiteLockMode.unstudiedInfo) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Ön Koşul Bilgilendirmesi'),
+          content: Text(
+            '${item.name} konusundan önce aşağıdaki temel konuları da gözden geçirmen önerilir:\n\n${eksikOnKosullar.map((e) => '• ${e.name}').join('\n')}',
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                provider.addSubjectToBasket(item);
+              },
+              child: const Text('Tamam'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final dialogResult = await _showPrerequisiteSelectionDialog(
+      subject: item,
+      provider: provider,
+      missingPrerequisites: eksikOnKosullar,
+      allowSkip: lockMode == _PrerequisiteLockMode.softLock,
+    );
+
+    if (!mounted || dialogResult == null) {
+      return;
+    }
+
+    if (dialogResult.addOnlyMainSubject) {
+      provider.addSubjectToBasket(item);
+      return;
+    }
+
+    if (dialogResult.selectedPrerequisites.isNotEmpty) {
+      provider.addSubjectToBasketWithPrerequisites(
+        item,
+        dialogResult.selectedPrerequisites,
+      );
+    }
+  }
+
+  Future<_PrerequisiteDialogResult?> _showPrerequisiteSelectionDialog({
+    required StudySubject subject,
+    required StudyProgramProvider provider,
+    required List<StudySubject> missingPrerequisites,
+    required bool allowSkip,
+  }) {
+    final selectedIds = <String>{};
+
+    return showDialog<_PrerequisiteDialogResult>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(
+                allowSkip ? 'Ön Koşul Önerisi' : 'Ön Koşul Gerekli',
+              ),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      allowSkip
+                        ? '${subject.name} konusuna geçmeden önce aşağıdaki ön koşulları sepete eklemen önerilir.'
+                        : 'Bu ${subject.name} konusunu sepete atmadan önce en az 1 ön koşul seçmelisin.',
+                    ),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: missingPrerequisites.map((prerequisite) {
+                            final effectiveHours = provider.getEffectiveDuration(
+                              prerequisite,
+                              prerequisite.columnId,
+                            );
+                            return CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              value: selectedIds.contains(prerequisite.id),
+                              onChanged: (value) {
+                                setDialogState(() {
+                                  if (value == true) {
+                                    selectedIds.add(prerequisite.id);
+                                  } else {
+                                    selectedIds.remove(prerequisite.id);
+                                  }
+                                });
+                              },
+                              title: Text(prerequisite.name),
+                              subtitle: Text(
+                                'Saf skor: ${prerequisite.opticalSuccess.toStringAsFixed(0)} • +${_formatHours(effectiveHours)} Saat',
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Vazgeç'),
+                ),
+                if (allowSkip)
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(
+                      const _PrerequisiteDialogResult(addOnlyMainSubject: true),
+                    ),
+                    child: const Text('Sadece Bunu Ekle'),
+                  ),
+                ElevatedButton(
+                  onPressed: selectedIds.isEmpty
+                      ? null
+                      : () {
+                          final selectedPrerequisites = missingPrerequisites
+                              .where((item) => selectedIds.contains(item.id))
+                              .toList();
+                          Navigator.of(dialogContext).pop(
+                            _PrerequisiteDialogResult(
+                              selectedPrerequisites: selectedPrerequisites,
+                            ),
+                          );
+                        },
+                  child: const Text('Ön Koşulla Birlikte Ekle'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildSubjectColumn(String columnId, StudyProgramProvider provider) {
     final config = columnConfigs[columnId]!;
     final String title = config['title'];
     final Color color = config['color'];
     final items = provider.getSubjectsForColumn(columnId);
+    final totalEffectiveHours = items.fold<double>(
+      0.0,
+      (sum, item) => sum + provider.getEffectiveDuration(item, columnId),
+    );
 
     final List<DropdownMenuItem<String?>> dropdownItems = [
       const DropdownMenuItem<String?>(value: null, child: Text("Tüm Dersler", style: TextStyle(fontSize: 13))),
@@ -155,9 +427,23 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
             decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: const BorderRadius.vertical(top: Radius.circular(10))),
-            child: Center(child: Text('$title (${items.length})', style: TextStyle(fontWeight: FontWeight.bold, color: color.withOpacity(0.9), fontSize: 14))),
+            child: Column(
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(fontWeight: FontWeight.bold, color: color.withOpacity(0.9), fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${items.length} Konu / ${totalEffectiveHours % 1 == 0 ? totalEffectiveHours.toStringAsFixed(0) : totalEffectiveHours.toStringAsFixed(1)} Saat',
+                  style: TextStyle(fontSize: 11, color: color.withOpacity(0.85), fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
@@ -194,6 +480,7 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
                     itemCount: items.length,
                     itemBuilder: (context, index) {
                       final item = items[index];
+                      final effectiveHours = provider.getEffectiveDuration(item, columnId);
                       return Draggable<StudySubject>(
                         data: item,
                         feedback: Material(elevation: 6, color: Colors.transparent, child: Container(width: 220, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.blueAccent)), child: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)))),
@@ -204,8 +491,14 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                             title: Text(item.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            subtitle: Text('Saf skor: ${item.safeScore.toStringAsFixed(0)} • Süre: ${item.estimatedStudyHours} saat', style: const TextStyle(fontSize: 11)),
-                            trailing: IconButton(icon: const Icon(Icons.add_circle, color: Colors.blueAccent, size: 20), onPressed: () => provider.addSubjectToBasket(item)),
+                            subtitle: Text(
+                              'Saf skor: ${item.safeScore.toStringAsFixed(0)} • Süre: ${effectiveHours % 1 == 0 ? effectiveHours.toStringAsFixed(0) : effectiveHours.toStringAsFixed(1)} saat',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.add_circle, color: Colors.blueAccent, size: 20),
+                              onPressed: () => _handleAddToBasket(item, provider),
+                            ),
                           ),
                         ),
                       );
@@ -285,7 +578,9 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
         Expanded(
           flex: 5,
           child: DragTarget<StudySubject>(
-            onAcceptWithDetails: (details) => provider.addSubjectToBasket(details.data),
+            onAcceptWithDetails: (details) {
+              _handleAddToBasket(details.data, provider);
+            },
             builder: (context, candidateData, rejectedData) {
               return Container(
                 margin: const EdgeInsets.all(16),
@@ -351,12 +646,18 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
     );
   }
 
-  Widget _buildTaskCardUI(StudySubject task, StudyProgramProvider provider, {bool isCompact = false}) {
+  Widget _buildTaskCardUI(
+    StudySubject task,
+    StudyProgramProvider provider, {
+    required int dayIndex,
+    bool isCompact = false,
+  }) {
     bool isSaved = provider.isProgramSaved;
+    final isCompletedForDay = task.completedDays.contains(dayIndex);
 
     return Card(
       elevation: isCompact ? 1 : 2,
-      color: task.isCompleted ? Colors.green.shade50 : Colors.white,
+      color: isCompletedForDay ? Colors.green.shade50 : Colors.white,
       margin: EdgeInsets.only(bottom: isCompact ? 6 : 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
@@ -364,13 +665,13 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
           ListTile(
             contentPadding: EdgeInsets.symmetric(horizontal: isCompact ? 4 : 16, vertical: 0),
             leading: Checkbox(
-              value: task.isCompleted,
+              value: isCompletedForDay,
               activeColor: Colors.green,
-              onChanged: (val) => setState(() => task.isCompleted = val ?? false),
+              onChanged: (_) => provider.toggleSubjectCompletion(task, dayIndex),
             ),
             title: Text(
               task.name, 
-              style: TextStyle(fontSize: isCompact ? 11 : 14, fontWeight: FontWeight.bold, decoration: task.isCompleted ? TextDecoration.lineThrough : null),
+              style: TextStyle(fontSize: isCompact ? 11 : 14, fontWeight: FontWeight.bold, decoration: isCompletedForDay ? TextDecoration.lineThrough : null),
               maxLines: isCompact ? 2 : null, overflow: isCompact ? TextOverflow.ellipsis : null,
             ),
             subtitle: isCompact ? null : Text('Durum: ${task.effectiveScore.toStringAsFixed(0)} puan'),
@@ -393,19 +694,23 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
     );
   }
 
-  Widget _buildDailyTaskCard(StudySubject task) {
+  Widget _buildDailyTaskCard(StudySubject task, int dayIndex) {
     final provider = context.read<StudyProgramProvider>();
-    return _buildTaskCardUI(task, provider, isCompact: true);
+    return _buildTaskCardUI(task, provider, dayIndex: dayIndex, isCompact: true);
   }
 
   Widget _buildWeeklyGridView(StudyProgramProvider provider) {
+    final visibleDays = List.generate(7, (index) => index)
+        .where((dayIndex) => !(provider.holidayPreferences.length > dayIndex && provider.holidayPreferences[dayIndex]))
+        .toList();
+
     return Expanded(
       child: Container(
         color: Colors.grey.shade50,
         padding: const EdgeInsets.all(8.0),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: List.generate(7, (dayIndex) {
+          children: visibleDays.map((dayIndex) {
             final loopDay = currentWeekStart.add(Duration(days: dayIndex));
             final dayTasks = provider.activeProgramSubjects.where((item) => item.assignedDays.contains(dayIndex)).toList();
 
@@ -439,15 +744,73 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
                       child: ListView.builder(
                         padding: const EdgeInsets.all(4),
                         itemCount: dayTasks.length,
-                        itemBuilder: (context, taskIndex) => _buildDailyTaskCard(dayTasks[taskIndex]),
+                        itemBuilder: (context, taskIndex) => _buildDailyTaskCard(dayTasks[taskIndex], dayIndex),
                       ),
                     ),
                   ],
                 ),
               ),
             );
-          }),
+          }).toList(),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTopBanner(StudyProgramProvider provider) {
+    final isOverBudget = provider.isOverBudget;
+    final statusMessage = isOverBudget
+        ? '⚠️ Kapasite Aşımı! Lütfen programı hafifletin.'
+        : '✅ Program kapasitesi ideal seviyede.';
+    final statusColors = isOverBudget
+        ? [Colors.redAccent, Colors.deepOrangeAccent]
+        : [Colors.green.shade600, Colors.blueAccent];
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: statusColors,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(isOverBudget ? Icons.warning_amber_rounded : Icons.verified, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  statusMessage,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+          if (provider.notificationMessages.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: provider.notificationMessages
+                  .map(
+                    (message) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        message,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -494,7 +857,7 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: dayTasks.length,
-                  itemBuilder: (context, index) => _buildTaskCardUI(dayTasks[index], provider, isCompact: false),
+                  itemBuilder: (context, index) => _buildTaskCardUI(dayTasks[index], provider, dayIndex: selectedDayIndex, isCompact: false),
                 ),
           ),
         ],
@@ -589,64 +952,88 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
             leading: Builder(
               builder: (context) => IconButton(icon: const Icon(Icons.menu), onPressed: () => Scaffold.of(context).openDrawer()),
             ),
-            title: AnimatedBuilder(
-              animation: _tabController,
-              builder: (context, child) {
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // SOL SEKME: TASARIM
-                    InkWell(
-                      onTap: () => _tabController.animateTo(0),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: _tabController.index == 0 ? Colors.blueAccent : Colors.transparent, width: 3))),
-                        child: Row(children: [Icon(Icons.dashboard_customize, size: 16, color: _tabController.index == 0 ? Colors.blueAccent : Colors.grey), const SizedBox(width: 4), Text('Tasarım', style: TextStyle(fontSize: 14, color: _tabController.index == 0 ? Colors.blueAccent : Colors.grey, fontWeight: FontWeight.bold))]),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // ORTA BUTON: GÜNCELLE
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange.shade600,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        minimumSize: const Size(0, 36),
-                      ),
-                      onPressed: () {
-                        if (provider.basketSubjects.isEmpty && !provider.hasActiveProgram) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lütfen önce sepete konu ekleyin!')));
-                          return;
-                        }
-                        _showHolidaySelectionDialog(context, provider);
-                      },
-                      icon: const Icon(Icons.sync, size: 16),
-                      label: const Text("GÜNCELLE", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ),
-                    const SizedBox(width: 16),
-                    // SAĞ SEKME: TAKVİM
-                    InkWell(
-                      onTap: () => _tabController.animateTo(1),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: _tabController.index == 1 ? Colors.blueAccent : Colors.transparent, width: 3))),
-                        child: Row(children: [Icon(Icons.event_note, size: 16, color: _tabController.index == 1 ? Colors.blueAccent : Colors.grey), const SizedBox(width: 4), Text('Takvim', style: TextStyle(fontSize: 14, color: _tabController.index == 1 ? Colors.blueAccent : Colors.grey, fontWeight: FontWeight.bold))]),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
+            title: const Text('Çalışma Programım'),
           ),
           body: Column(
             children: [
+              _buildTopBanner(provider),
+              const SizedBox(height: 12),
               Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  physics: const NeverScrollableScrollPhysics(),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildProgramBuilderTab(provider),
-                    _buildDailyCalendarTab(provider),
+                    Container(
+                      width: 180,
+                      margin: const EdgeInsets.fromLTRB(16, 0, 12, 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4)),
+                        ],
+                        border: Border.all(color: Colors.blueGrey.shade100),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _tabController.index == 0 ? Colors.blueAccent : Colors.blueGrey.shade100,
+                              foregroundColor: _tabController.index == 0 ? Colors.white : Colors.black87,
+                              alignment: Alignment.centerLeft,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                            ),
+                            onPressed: () => _tabController.animateTo(0),
+                            icon: const Icon(Icons.dashboard_customize, size: 18),
+                            label: const Text('Tasarım'),
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange.shade600,
+                              foregroundColor: Colors.white,
+                              alignment: Alignment.centerLeft,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                            ),
+                            onPressed: () {
+                              if (provider.basketSubjects.isEmpty && !provider.hasActiveProgram) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lütfen önce sepete konu ekleyin!')));
+                                return;
+                              }
+                              _showHolidaySelectionDialog(context, provider);
+                            },
+                            icon: const Icon(Icons.sync, size: 18),
+                            label: const Text('Güncelle'),
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _tabController.index == 1 ? Colors.blueAccent : Colors.blueGrey.shade100,
+                              foregroundColor: _tabController.index == 1 ? Colors.white : Colors.black87,
+                              alignment: Alignment.centerLeft,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                            ),
+                            onPressed: () => _tabController.animateTo(1),
+                            icon: const Icon(Icons.event_note, size: 18),
+                            label: const Text('Takvim'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 16, bottom: 16),
+                        child: TabBarView(
+                          controller: _tabController,
+                          physics: const NeverScrollableScrollPhysics(),
+                          children: [
+                            _buildProgramBuilderTab(provider),
+                            _buildDailyCalendarTab(provider),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),

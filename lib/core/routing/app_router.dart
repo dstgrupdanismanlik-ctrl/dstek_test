@@ -13,6 +13,7 @@ import 'package:dstek/features/exams/screens/exam_entry_screen.dart';
 import 'package:dstek/features/guidance_counseling/screens/guidance_counseling_screen.dart';
 import 'package:dstek/features/inventory_system/inventory_system_screen.dart';
 import 'package:dstek/features/admin/screens/admin_settings_screen.dart';
+import 'package:dstek/features/study_program/screens/analysis_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -47,6 +48,10 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: '/study-program',
           builder: (context, state) => const StudyProgramScreen(),
+        ),
+        GoRoute(
+          path: '/analysis',
+          builder: (context, state) => const AnalysisScreen(),
         ),
         GoRoute(
           path: '/academic-study-room',

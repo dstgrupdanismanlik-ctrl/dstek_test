@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/study_subject.dart';
 
+class PrerequisiteStatus {
+  const PrerequisiteStatus({required this.missingPrerequisites});
+
+  final List<StudySubject> missingPrerequisites;
+
+  bool get hasBlockingPrerequisites => missingPrerequisites.isNotEmpty;
+}
+
 class StudyProgramProvider extends ChangeNotifier {
   StudyProgramProvider() {
     _loadFromFirestore();
@@ -10,6 +18,12 @@ class StudyProgramProvider extends ChangeNotifier {
   final List<StudySubject> _subjects = [];
   final List<StudySubject> _basketSubjects = [];
   final List<StudySubject> _activeProgramSubjects = []; 
+  final List<String> teacherSupportList = [];
+  final List<String> notificationMessages = [];
+  final Map<String, StudySubject> _subjectsByCode = {};
+  final Map<String, String> _subjectCodeById = {};
+  final Map<String, List<String>> _prerequisiteCodesBySubjectCode = {};
+  final Map<String, double> _xrayScoresByCode = {};
   List<bool> holidayPreferences = [false, false, false, false, false, false, true];
 
   final List<String> _columnOrder = [
@@ -29,7 +43,7 @@ class StudyProgramProvider extends ChangeNotifier {
   };
 
   int _activeDayCount = 6;
-  int _remainingHours = 50;
+  double _remainingHours = 50.0;
   String? _lastMessage;
   bool _isOverBudget = false;
   bool _hasActiveProgram = false;
@@ -40,29 +54,194 @@ class StudyProgramProvider extends ChangeNotifier {
   List<StudySubject> get subjects => List.unmodifiable(_subjects);
   List<StudySubject> get basketSubjects => List.unmodifiable(_basketSubjects);
   List<StudySubject> get activeProgramSubjects => List.unmodifiable(_activeProgramSubjects);
+  List<StudySubject> get allSubjects {
+    final byId = <String, StudySubject>{};
+    for (final subject in [..._subjects, ..._basketSubjects, ..._activeProgramSubjects]) {
+      byId[subject.id] = subject;
+    }
+    return byId.values.toList();
+  }
   List<String> get columnOrder => List.unmodifiable(_columnOrder);
 
-  int get remainingHours => _remainingHours;
+  double get remainingHours => _remainingHours;
   int get activeDayCount => _activeDayCount;
   String? get lastMessage => _lastMessage;
-  bool get isOverBudget => _isOverBudget;
+  bool get isOverBudget {
+    final activeDays = holidayPreferences.where((isHoliday) => !isHoliday).length;
+    final maxCapacity = (activeDays * 8.0) + 2.0;
+    final totalEffectiveHours = _calculateEffectiveHoursFor([
+      ..._basketSubjects,
+      ..._activeProgramSubjects,
+    ]);
+    return totalEffectiveHours > maxCapacity;
+  }
   bool get hasActiveProgram => _hasActiveProgram;
   bool get isProgramSaved => _isProgramSaved; // YENİ
 
-  int get weeklyBudgetHours => _calculateWeeklyBudgetHours(_activeDayCount);
+  double get weeklyBudgetHours => _calculateWeeklyBudgetHours(_activeDayCount);
   double get budgetProgress => (_remainingHours / weeklyBudgetHours).clamp(0.0, 1.0);
 
-  int _calculateWeeklyBudgetHours(int activeDayCount) {
-    if (activeDayCount == 6) return 50;
-    if (activeDayCount == 7) return 58;
-    return 50 - ((6 - activeDayCount) * 8);
+  double _calculateWeeklyBudgetHours(int activeDayCount) {
+    if (activeDayCount == 6) return 50.0;
+    if (activeDayCount == 7) return 58.0;
+    return (50 - ((6 - activeDayCount) * 8)).toDouble();
+  }
+
+  List<String> _parsePrerequisiteCodes(dynamic rawValue) {
+    final codes = rawValue is List
+        ? rawValue.map((item) => item.toString()).join(',')
+        : rawValue?.toString();
+
+    if (codes == null || codes.trim().isEmpty) {
+      return const [];
+    }
+
+    final rawCodes = <String>[];
+    final regExp = RegExp(r'\b[TA]_[A-ZÇĞİÖŞÜ]+_\d+\b');
+
+    for (final part in codes.split(',')) {
+      final match = regExp.firstMatch(part);
+      if (match != null) {
+        rawCodes.add(match.group(0)!);
+      }
+    }
+
+    return rawCodes;
+  }
+
+  List<String> _extractPrerequisiteCodesFromText(String? text) {
+    if (text == null || text.trim().isEmpty) {
+      return const [];
+    }
+
+    final regExp = RegExp(r'\b[TA]_[A-ZÇĞİÖŞÜ]+_\d+\b');
+    return regExp
+        .allMatches(text)
+        .map((match) => match.group(0)!)
+        .toList();
+  }
+
+  Iterable<StudySubject> get _allKnownSubjects sync* {
+    final seenIds = <String>{};
+    for (final subject in [..._subjects, ..._basketSubjects, ..._activeProgramSubjects]) {
+      if (seenIds.add(subject.id)) {
+        yield subject;
+      }
+    }
+  }
+
+  bool _isQueuedOrActive(StudySubject subject) {
+    return _basketSubjects.contains(subject) || _activeProgramSubjects.contains(subject);
+  }
+
+  double _calculateEffectiveHoursFor(Iterable<StudySubject> subjects) {
+    return subjects.fold<double>(
+      0.0,
+      (sum, subject) => sum + getEffectiveDuration(subject, subject.columnId),
+    );
+  }
+
+  bool _addSubjectsToBasketInternal(List<StudySubject> subjectsToAdd) {
+    final availableSubjects = subjectsToAdd.where((subject) => _subjects.contains(subject)).toList();
+    if (availableSubjects.isEmpty) {
+      return false;
+    }
+
+    final requiredHours = _calculateEffectiveHoursFor(availableSubjects);
+    final absoluteMaxHours = (_activeDayCount * 12).toDouble();
+    final currentTotalHours = weeklyBudgetHours - _remainingHours;
+
+    if ((currentTotalHours + requiredHours) > absoluteMaxHours) {
+      _lastMessage = 'KAPASİTE DOLDU! Günde ortalama 12 saati aşamazsınız. Daha fazla konu eklenemez.';
+      notifyListeners();
+      return false;
+    }
+
+    _remainingHours -= requiredHours;
+    _isOverBudget = _remainingHours < 0;
+
+    final insertIndex = _basketSubjects.length;
+    for (var i = 0; i < availableSubjects.length; i++) {
+      final subject = availableSubjects[i];
+      _subjects.remove(subject);
+      _basketSubjects.insert(insertIndex + i, subject);
+    }
+
+    if (_isOverBudget) {
+      _lastMessage = 'Haftalık bütçenizi aştınız! Bu kadar konuyu çalışmakta zorlanabilirsiniz.';
+    } else if (availableSubjects.length == 1) {
+      _lastMessage = '${availableSubjects.first.name} sepete eklendi.';
+    } else {
+      _lastMessage = '${availableSubjects.length} konu sepete eklendi.';
+    }
+
+    notifyListeners();
+    return true;
+  }
+
+  double getEffectiveDuration(StudySubject subject, String sourceColumnId) {
+    if (sourceColumnId == 'column-1') {
+      return subject.estimatedStudyHours.toDouble();
+    }
+
+    if (sourceColumnId == 'column-2' || sourceColumnId == 'column-3') {
+      return subject.repeatStudyHours;
+    }
+
+    if (sourceColumnId == 'column-4' || sourceColumnId == 'column-5') {
+      return subject.questionSolveHours;
+    }
+
+    return subject.estimatedStudyHours.toDouble();
+  }
+
+  String _columnIdForScore(double score) {
+    if (!score.isFinite || score <= 0) {
+      return 'column-1';
+    }
+    if (score < 70) {
+      return 'column-2';
+    }
+    if (score < 80) {
+      return 'column-3';
+    }
+    if (score < 90) {
+      return 'column-4';
+    }
+    return 'column-5';
   }
 
   Future<void> _loadFromFirestore() async {
     try {
-      final snapshot = await FirebaseFirestore.instance.collection('curriculum').get();
+      final firestore = FirebaseFirestore.instance;
+      final snapshot = await firestore.collection('curriculum').get();
+      final xraySnapshot = await firestore
+          .collection('student_subjects_xray')
+          .get();
+
+      _xrayScoresByCode.clear();
+      _prerequisiteCodesBySubjectCode.clear();
+      for (final doc in xraySnapshot.docs) {
+        final xrayData = doc.data();
+        final konuKodu = xrayData['konu_kodu']?.toString().trim() ?? '';
+        if (konuKodu.isEmpty) {
+          continue;
+        }
+
+        final rawScore = xrayData['guvenilir_basari_skoru'];
+        final parsedScore = rawScore is num
+            ? rawScore.toDouble()
+            : double.tryParse(rawScore?.toString() ?? '') ?? 0.0;
+        _xrayScoresByCode[konuKodu] = parsedScore.isFinite ? parsedScore : 0.0;
+        _prerequisiteCodesBySubjectCode[konuKodu] = {
+          ..._parsePrerequisiteCodes(xrayData['ders_ici_on_kosul']),
+          ..._parsePrerequisiteCodes(xrayData['ders_disi_on_kosul']),
+        }.toList();
+      }
 
       final List<StudySubject> loadedSubjects = [];
+      _subjectsByCode.clear();
+      _subjectCodeById.clear();
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
@@ -71,21 +250,39 @@ class StudyProgramProvider extends ChangeNotifier {
         final String konuAdi = data['konu_adi']?.toString() ?? 'İsimsiz Konu';
         final String dersAdi = data['ders_adi']?.toString() ?? 'Bilinmeyen Ders';
         final int saat = int.tryParse(data['tahmini_calisma_saati']?.toString() ?? '4') ?? 4;
+        final double tekrarCalismaSaati = data['tekrar_calisma_saati'] is num
+          ? (data['tekrar_calisma_saati'] as num).toDouble()
+          : double.tryParse(data['tekrar_calisma_saati']?.toString() ?? '') ??
+              saat.toDouble();
+        final double soruCozmeSaati = data['soru_cozme_saati'] is num
+          ? (data['soru_cozme_saati'] as num).toDouble()
+          : double.tryParse(data['soru_cozme_saati']?.toString() ?? '') ??
+              saat.toDouble();
         final int onerilenGun = int.tryParse(data['onerilen_gun_sayisi']?.toString().trim() ?? '1') ?? 1;
         final int sira = int.tryParse(data['program_sirasi']?.toString().trim() ?? '9999') ?? 9999;
+        final double konuSkoru = _xrayScoresByCode[konuKodu] ?? 0.0;
 
         if (data['is_active'] == true || data['is_active'] == 'TRUE') {
-          loadedSubjects.add(StudySubject(
+          final subject = StudySubject(
             id: doc.id,
             name: '$konuKodu - $konuAdi',
-            opticalSuccess: 0.0,
-            manualSuccess: 0.0,
+            opticalSuccess: konuSkoru,
+            manualSuccess: konuSkoru,
             estimatedStudyHours: saat,
+            repeatStudyHours: tekrarCalismaSaati,
+            questionSolveHours: soruCozmeSaati,
+            inCoursePrerequisite: data['ders_ici_on_kosul']?.toString(),
+            outOfCoursePrerequisite: data['ders_disi_on_kosul']?.toString(),
             recommendedDays: onerilenGun,
             courseName: dersAdi,
             programOrder: sira,
-            columnId: 'column-1',
-          ));
+            columnId: _columnIdForScore(konuSkoru),
+          );
+          loadedSubjects.add(subject);
+          if (konuKodu.trim().isNotEmpty) {
+            _subjectsByCode[konuKodu.trim()] = subject;
+            _subjectCodeById[subject.id] = konuKodu.trim();
+          }
         }
       }
 
@@ -141,61 +338,129 @@ class StudyProgramProvider extends ChangeNotifier {
       list = list.where((s) => s.courseName.trim() == filter).toList();
     }
 
-    // BAŞ MİMAR KURALI 2: Filtrelenen listeyi kesin olarak Excel'deki "programOrder" değerine göre diz
-    list.sort((a, b) => a.programOrder.compareTo(b.programOrder));
+    list.sort((a, b) {
+      bool aIsTyt = a.name.startsWith('T_');
+      bool bIsTyt = b.name.startsWith('T_');
+      if (aIsTyt && !bIsTyt) return -1;
+      if (!aIsTyt && bIsTyt) return 1;
+      return a.programOrder.compareTo(b.programOrder);
+    });
 
     return list;
+  }
+
+  List<StudySubject> getMissingPrerequisites(StudySubject subject) {
+    if (subject.inCoursePrerequisite == null ||
+        subject.inCoursePrerequisite!.trim().isEmpty) {
+      return const <StudySubject>[];
+    }
+
+    final rawCodes = _extractPrerequisiteCodesFromText(
+      subject.inCoursePrerequisite,
+    );
+
+    final missingPrerequisites = <StudySubject>[];
+    final seenIds = <String>{};
+    final allSubjects = _allKnownSubjects.toList();
+
+    for (final rawCode in rawCodes) {
+      final preSubject = allSubjects.firstWhere(
+        (s) => RegExp('^${RegExp.escape(rawCode)}\\b').hasMatch(s.name),
+        orElse: () => _subjectsByCode[rawCode] ?? subject,
+      );
+
+      if (identical(preSubject, subject)) {
+        continue;
+      }
+
+      final prerequisiteScore = _xrayScoresByCode[rawCode] ?? preSubject.safeScore;
+      if (prerequisiteScore < 70 && seenIds.add(preSubject.id)) {
+        missingPrerequisites.add(preSubject);
+      }
+    }
+
+    missingPrerequisites.sort((a, b) => a.programOrder.compareTo(b.programOrder));
+    return missingPrerequisites;
+  }
+
+  PrerequisiteStatus analyzePrerequisites(StudySubject subject) {
+    return PrerequisiteStatus(
+      missingPrerequisites: getMissingPrerequisites(subject),
+    );
   }
 
   bool addSubjectToBasket(StudySubject subject) {
     if (!_subjects.contains(subject)) return false;
 
-    int requiredHours = subject.estimatedStudyHours;
+    return _addSubjectsToBasketInternal([subject]);
+  }
 
-    // BAŞ MİMAR KURALI: Mutlak Kapasite Reddi (Günde max 10 saat + 2 saat ısrar payı)
-    int absoluteMaxHours = _activeDayCount * 12;
-    int currentTotalHours = weeklyBudgetHours - _remainingHours;
+  // TODO: Bu veri ileride system_constants'tan veya öğrenci profilinden çekilecek. Şimdilik test için 150 gün veriyoruz.
+  int get daysUntilExam => 150;
 
-    if ((currentTotalHours + requiredHours) > absoluteMaxHours) {
-      _lastMessage = 'KAPASİTE DOLDU! Günde ortalama 12 saati aşamazsınız. Daha fazla konu eklenemez.';
+  int getCompletedSubjectCountInProgram() {
+    int basketCount = _basketSubjects.where((s) => s.columnId == 'column-5').length;
+    int programCount = _activeProgramSubjects.where((s) => s.columnId == 'column-5').length;
+    return basketCount + programCount;
+  }
+
+  void sendToTeacher(StudySubject subject) {
+    if (!teacherSupportList.contains(subject.name)) {
+      _subjects.remove(subject);
+      teacherSupportList.add(subject.name);
+      notificationMessages.add(
+        '📌 ${subject.name} konusu için öğretmenden destek almalısın!',
+      );
       notifyListeners();
-      return false; // Sistemi kilitler ve konuyu sepete atmaz
+    }
+  }
+
+  bool addSubjectToBasketWithPrerequisites(
+    StudySubject subject,
+    List<StudySubject> selectedPrerequisites,
+  ) {
+    if (!_subjects.contains(subject)) {
+      return false;
     }
 
-    _remainingHours -= requiredHours;
-    _isOverBudget = _remainingHours < 0;
+    final prerequisitesToAdd = selectedPrerequisites
+        .where((item) => item.id != subject.id && _subjects.contains(item))
+        .toList()
+      ..sort((a, b) => a.programOrder.compareTo(b.programOrder));
 
-    _subjects.remove(subject);
-    _basketSubjects.add(subject);
+    return _addSubjectsToBasketInternal([
+      ...prerequisitesToAdd,
+      subject,
+    ]);
+  }
 
-    if (_isOverBudget) {
-      _lastMessage = 'Haftalık bütçenizi aştınız! Bu kadar konuyu çalışmakta zorlanabilirsiniz.';
-    } else {
-      _lastMessage = '${subject.name} sepete eklendi.';
+  StudySubject? findSubjectByCode(String code) {
+    for (final subject in _allKnownSubjects) {
+      if (subject.name.startsWith('$code ' ) || subject.name.startsWith('$code-')) {
+        return subject;
+      }
     }
-
-    notifyListeners();
-    return true;
+    return _subjectsByCode[code.trim()];
   }
 
   void removeFromBasket(StudySubject subject) {
     _basketSubjects.remove(subject);
     _subjects.add(subject);
-    _remainingHours += subject.estimatedStudyHours;
+    _remainingHours += getEffectiveDuration(subject, subject.columnId);
     _isOverBudget = false;
     notifyListeners();
   }
 
   void removeFromProgram(StudySubject item) {
     _activeProgramSubjects.remove(item);
-    item.assignedDays = [];
-    item.isCompleted = false;
-    _subjects.add(item); 
+    final resetItem = item.copyWith(completedDays: const []);
+    resetItem.assignedDays = [];
+    _subjects.add(resetItem); 
     
     if (_activeProgramSubjects.isEmpty) {
       _hasActiveProgram = false;
     }
-    _remainingHours += item.estimatedStudyHours;
+    _remainingHours += getEffectiveDuration(item, item.columnId);
     _isOverBudget = false;
     notifyListeners();
   }
@@ -203,6 +468,25 @@ class StudyProgramProvider extends ChangeNotifier {
   void changeSubjectDay(StudySubject item, int newDayIndex) {
     item.assignedDays = [newDayIndex];
     notifyListeners();
+  }
+
+  void toggleSubjectCompletion(StudySubject subject, int dayIndex) {
+    final index = _activeProgramSubjects.indexWhere((s) => s.id == subject.id);
+    if (index != -1) {
+      final updatedCompletedDays = List<int>.from(
+        _activeProgramSubjects[index].completedDays,
+      );
+      if (updatedCompletedDays.contains(dayIndex)) {
+        updatedCompletedDays.remove(dayIndex);
+      } else {
+        updatedCompletedDays.add(dayIndex);
+      }
+
+      _activeProgramSubjects[index] = _activeProgramSubjects[index].copyWith(
+        completedDays: updatedCompletedDays,
+      );
+      notifyListeners();
+    }
   }
 
   void distributeProgram(List<int> activeDays) {

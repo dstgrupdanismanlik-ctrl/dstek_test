@@ -19,6 +19,7 @@ enum _SyncTable {
   systemConstants,
   opticTests,
   opticPracticeExams,
+  student_xray,
 }
 
 class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
@@ -39,6 +40,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         return 'YKS Optikli Testler';
       case _SyncTable.opticPracticeExams:
         return 'YKS Optikli Denemeler';
+      case _SyncTable.student_xray:
+        return 'Öğrenci Konu Röntgeni (Geçici Test)';
     }
   }
 
@@ -108,6 +111,13 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                       onChanged: (value) =>
                           onToggle(_SyncTable.opticPracticeExams, value ?? false),
                       title: Text(_syncTableLabel(_SyncTable.opticPracticeExams)),
+                    ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: selectedTables.contains(_SyncTable.student_xray),
+                      onChanged: (value) =>
+                          onToggle(_SyncTable.student_xray, value ?? false),
+                      title: Text(_syncTableLabel(_SyncTable.student_xray)),
                     ),
                   ],
                 ),
@@ -219,6 +229,160 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     return 'record_$fallbackIndex';
   }
 
+  Map<String, dynamic> _parseJsonObject(dynamic rawValue) {
+    if (rawValue is Map) {
+      return Map<String, dynamic>.from(rawValue);
+    }
+
+    if (rawValue is! String || rawValue.trim().isEmpty) {
+      return <String, dynamic>{};
+    }
+
+    try {
+      final decoded = jsonDecode(rawValue);
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    } catch (_) {
+      return <String, dynamic>{};
+    }
+
+    return <String, dynamic>{};
+  }
+
+  int _readScoreValue(Map<String, dynamic> data, String key) {
+    final value = data[key];
+    if (value is num) {
+      return value.toInt();
+    }
+
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  double _calculatePercentage(Map<String, dynamic> scoreData) {
+    final correct = _readScoreValue(scoreData, 'D');
+    final wrong = _readScoreValue(scoreData, 'Y');
+    final blank = _readScoreValue(scoreData, 'B');
+    final total = correct + wrong + blank;
+
+    if (total == 0) {
+      return 0;
+    }
+
+    return (correct / total) * 100;
+  }
+
+  bool _hasAnsweredData(Map<String, dynamic> scoreData) {
+    return _readScoreValue(scoreData, 'D') > 0 ||
+        _readScoreValue(scoreData, 'Y') > 0 ||
+        _readScoreValue(scoreData, 'B') > 0;
+  }
+
+  double? _parseDouble(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    if (value is String) {
+      final normalized = value.trim().replaceAll(',', '.');
+      if (normalized.isEmpty) {
+        return null;
+      }
+      return double.tryParse(normalized);
+    }
+
+    return null;
+  }
+
+  dynamic _prepareCurriculumPayload(dynamic payload) {
+    Map<String, dynamic> enrichRecord(Map<String, dynamic> rawRecord) {
+      final data = Map<String, dynamic>.from(rawRecord);
+      data['ders_ici_on_kosul'] = data['ders_ici_on_kosul']?.toString();
+      data['ders_disi_on_kosul'] = data['ders_disi_on_kosul']?.toString();
+      data['tekrar_calisma_saati'] =
+          _parseDouble(data['tekrar_calisma_saati']) ??
+          _parseDouble(data['tahmini_calisma_saati']);
+      data['soru_cozme_saati'] =
+          _parseDouble(data['soru_cozme_saati']) ??
+          _parseDouble(data['tahmini_calisma_saati']);
+      return data;
+    }
+
+    if (payload is List) {
+      return payload
+          .map((item) => item is Map ? enrichRecord(Map<String, dynamic>.from(item)) : item)
+          .toList();
+    }
+
+    if (payload is Map) {
+      final prepared = <String, dynamic>{};
+      payload.forEach((key, value) {
+        if (value is Map) {
+          prepared[key.toString()] = enrichRecord(Map<String, dynamic>.from(value));
+        } else {
+          prepared[key.toString()] = value;
+        }
+      });
+      return prepared;
+    }
+
+    return payload;
+  }
+
+  dynamic _prepareStudentXrayPayload(dynamic payload) {
+    Map<String, dynamic> enrichRecord(Map<String, dynamic> rawRecord) {
+      final record = Map<String, dynamic>.from(rawRecord);
+      final manuelMap = _parseJsonObject(record['manuel_d_y_b']);
+      final optikMap = _parseJsonObject(record['optik_test_d_y_b']);
+
+      final manuelYuzde = _calculatePercentage(manuelMap);
+      final optikYuzde = _calculatePercentage(optikMap);
+      final hasManuel = _hasAnsweredData(manuelMap);
+      final hasOptik = _hasAnsweredData(optikMap);
+      final manuel = manuelYuzde;
+      final optik = optikYuzde;
+
+      final double guvenilirBasariSkoru;
+      if (hasOptik && hasManuel) {
+        guvenilirBasariSkoru = (optikYuzde * 0.70) + (manuelYuzde * 0.30);
+      } else if (hasOptik) {
+        guvenilirBasariSkoru = optikYuzde;
+      } else if (hasManuel) {
+        guvenilirBasariSkoru = manuelYuzde;
+      } else {
+        guvenilirBasariSkoru = 0;
+      }
+
+      record['manuel_d_y_b'] = manuelMap;
+      record['optik_test_d_y_b'] = optikMap;
+      record['manuel_yuzde'] = manuelYuzde;
+      record['optik_yuzde'] = optikYuzde;
+      record['guvenilir_basari_skoru'] = guvenilirBasariSkoru;
+      debugPrint('🛠️ 70/30 TEST -> Optik: $optik | Manuel: $manuel | SONUÇ: $guvenilirBasariSkoru');
+      return record;
+    }
+
+    if (payload is List) {
+      return payload
+          .map((item) => item is Map ? enrichRecord(Map<String, dynamic>.from(item)) : item)
+          .toList();
+    }
+
+    if (payload is Map) {
+      final prepared = <String, dynamic>{};
+      payload.forEach((key, value) {
+        if (value is Map) {
+          prepared[key.toString()] = enrichRecord(Map<String, dynamic>.from(value));
+        } else {
+          prepared[key.toString()] = value;
+        }
+      });
+      return prepared;
+    }
+
+    return payload;
+  }
+
   Future<void> _clearCollection(String collectionName) async {
     final snapshot = await _firestore.collection(collectionName).get();
     final batch = _firestore.batch();
@@ -310,7 +474,16 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         var totalCount = 0;
 
         String _normalize(String value) {
-          return value.toLowerCase().replaceAll('_', ' ').replaceAll('-', ' ');
+          return value
+              .toLowerCase()
+              .replaceAll('ç', 'c')
+              .replaceAll('ğ', 'g')
+              .replaceAll('ı', 'i')
+              .replaceAll('ö', 'o')
+              .replaceAll('ş', 's')
+              .replaceAll('ü', 'u')
+              .replaceAll('_', ' ')
+              .replaceAll('-', ' ');
         }
 
         String? _findPayloadKey(List<String> tokens) {
@@ -338,6 +511,12 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
           'sabitler',
           'sistem sabitleri',
         ]);
+        final studentXrayKey = _findPayloadKey([
+          'tablo4',
+          'tablo 4',
+          'rontgen',
+          'xray',
+        ]);
         final optikTestKey = data.containsKey('YKS OPTİKLİ TEST') ? 'YKS OPTİKLİ TEST' : null;
         final optikDenemeKey = data.containsKey('YKS OPTİKLİ DENEME') ? 'YKS OPTİKLİ DENEME' : null;
 
@@ -347,7 +526,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
             payloadKey: yksKey ?? 'yks_dersleri',
             collectionName: 'curriculum',
             docKeyCandidates: const ['konu_kodu', 'id', 'kod'],
-            payload: yksKey == null ? null : data[yksKey],
+            payload: yksKey == null ? null : _prepareCurriculumPayload(data[yksKey]),
           );
         }
 
@@ -368,6 +547,18 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
             collectionName: 'system_constants',
             docKeyCandidates: const ['id', 'sabit_kodu', 'kod', 'key'],
             payload: sabitlerKey == null ? null : data[sabitlerKey],
+          );
+        }
+
+        if (selectedTables.contains(_SyncTable.student_xray)) {
+          totalCount += await _upsertTableData(
+            firestore: _firestore,
+            payloadKey: studentXrayKey ?? 'student_subjects_xray',
+            collectionName: 'student_subjects_xray',
+            docKeyCandidates: const ['id', 'ogrenci_no', 'student_id', 'key'],
+            payload: studentXrayKey == null
+                ? null
+                : _prepareStudentXrayPayload(data[studentXrayKey]),
           );
         }
 
