@@ -77,13 +77,19 @@ class _AcademicStudyRoomScreenState extends State<AcademicStudyRoomScreen> {
       final launched = await launchUrlString(url, mode: LaunchMode.externalApplication);
       if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bağlantı açılamadı. Lütfen URL kontrol edin.')),
+          const SnackBar(
+            content: Text('Bağlantı açılamadı. Lütfen URL kontrol edin.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bağlantı açılamadı. Lütfen URL kontrol edin.')),
+          const SnackBar(
+            content: Text('Bağlantı açılamadı. Lütfen URL kontrol edin.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }

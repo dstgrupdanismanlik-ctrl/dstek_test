@@ -1,83 +1,145 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dstek/shared/widgets/app_drawer.dart';
 
-// ==========================================
-// ANA KABUK: SINAVLAR MERKEZİ (Düzeltildi)
-// ==========================================
-// ==========================================
-// ANA KABUK: SINAVLAR MERKEZİ
-// ==========================================
-class ExamEntryScreen extends StatelessWidget {
-  const ExamEntryScreen({super.key});
+enum ExamMode { test, deneme }
+
+enum ExamEntryType { manuel, optikli }
+
+class ExamEntryScreen extends StatefulWidget {
+  final ExamMode mode;
+
+  const ExamEntryScreen({super.key, this.mode = ExamMode.test});
+
+  @override
+  State<ExamEntryScreen> createState() => _ExamEntryScreenState();
+}
+
+class _ExamEntryScreenState extends State<ExamEntryScreen> {
+  ExamEntryType _entryType = ExamEntryType.manuel;
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        drawer: AppDrawer(),
-        appBar: AppBar(
-          title: const Text('Test ve Sınav Merkezi'),
-          centerTitle: true,
-          automaticallyImplyLeading: false,
-          leading: Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
+    final title = widget.mode == ExamMode.test
+        ? 'Test Girişleri'
+        : 'Deneme Girişleri';
+
+    return Scaffold(
+      drawer: AppDrawer(),
+      appBar: AppBar(
+        title: Text(title),
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        body: Column(
-          children: [
-            Container(
-              color: Colors.grey.shade200,
-              child: const TabBar(
-                labelColor: Colors.blueAccent,
-                unselectedLabelColor: Colors.grey,
-                indicatorColor: Colors.blueAccent,
-                labelStyle: TextStyle(fontWeight: FontWeight.bold),
-                tabs: [
-                  Tab(icon: Icon(Icons.edit), text: 'Test Girişleri'),
-                  Tab(icon: Icon(Icons.assignment), text: 'Deneme Girişleri'),
-                ],
-              ),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: _buildEntryTypeSelector(context),
+          ),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: _buildBodyForMode(),
             ),
-            const Expanded(
-              child: TabBarView(
-                children: [
-                  TestEntryScreen(),
-                  PracticeExamEntryScreen(),
-                ],
-              ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEntryTypeSelector(BuildContext context) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Giriş türünü seç. Örnek: Manuel / Optikli',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            SegmentedButton<ExamEntryType>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment<ExamEntryType>(
+                  value: ExamEntryType.manuel,
+                  icon: Icon(Icons.edit_note_outlined),
+                  label: Text('Manuel Giriş'),
+                ),
+                ButtonSegment<ExamEntryType>(
+                  value: ExamEntryType.optikli,
+                  icon: Icon(Icons.qr_code_scanner),
+                  label: Text('Optikli Giriş'),
+                ),
+              ],
+              selected: {_entryType},
+              onSelectionChanged: (selection) {
+                setState(() => _entryType = selection.first);
+              },
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildBodyForMode() {
+    if (widget.mode == ExamMode.test) {
+      if (_entryType == ExamEntryType.manuel) {
+        return const ManualTestEntryTab(key: ValueKey('manual-test'));
+      }
+      return const OpticTestTab(key: ValueKey('optic-test'));
+    }
+
+    if (_entryType == ExamEntryType.manuel) {
+      return const ManualPracticeExamEntryTab(key: ValueKey('manual-deneme'));
+    }
+    return const PracticeOpticExamTab(key: ValueKey('optic-deneme'));
+  }
 }
 
-// ==========================================
-// EVRENSEL WIDGET: 2 HANE SINIRLI NUMERİK GİRİŞ
-// ==========================================
 class NumericInputField extends StatelessWidget {
   final String label;
-  const NumericInputField({super.key, required this.label});
+  final TextEditingController? controller;
+  final bool enabled;
+
+  const NumericInputField({
+    super.key,
+    required this.label,
+    this.controller,
+    this.enabled = true,
+  });
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
+      controller: controller,
+      enabled: enabled,
       keyboardType: TextInputType.number,
       inputFormatters: [
         FilteringTextInputFormatter.digitsOnly,
-        LengthLimitingTextInputFormatter(2), // Max 2 hane kuralı
+        LengthLimitingTextInputFormatter(2),
       ],
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
       ),
     );
   }
@@ -85,7 +147,9 @@ class NumericInputField extends StatelessWidget {
 
 class CustomDropdown extends StatelessWidget {
   final String hint;
-  const CustomDropdown({super.key, required this.hint});
+  final bool enabled;
+
+  const CustomDropdown({super.key, required this.hint, this.enabled = true});
 
   @override
   Widget build(BuildContext context) {
@@ -93,93 +157,889 @@ class CustomDropdown extends StatelessWidget {
       decoration: InputDecoration(
         labelText: hint,
         border: const OutlineInputBorder(),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
       ),
       items: const [
         DropdownMenuItem(value: '1', child: Text('Seçenek 1')),
         DropdownMenuItem(value: '2', child: Text('Seçenek 2')),
       ],
-      onChanged: (value) {},
+      onChanged: enabled ? (value) {} : null,
     );
   }
 }
 
-// ==========================================
-// EKRAN 1: TEST GİRİŞLERİ ALANI
-// ==========================================
-class TestEntryScreen extends StatelessWidget {
-  const TestEntryScreen({super.key});
+class ManualTestEntryTab extends StatefulWidget {
+  const ManualTestEntryTab({super.key});
+
+  @override
+  State<ManualTestEntryTab> createState() => _ManualTestEntryTabState();
+}
+
+class _ManualTestEntryTabState extends State<ManualTestEntryTab> {
+  static const String _duplicateErrorText =
+      'Hata: Bu testi/denemeyi daha önce çözmüşsünüz. Mükerrer kayıt yapılamaz.';
+
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final TextEditingController _testNameController = TextEditingController();
+  final TextEditingController _correctController = TextEditingController();
+  final TextEditingController _wrongController = TextEditingController();
+  final TextEditingController _emptyController = TextEditingController();
+
+  List<CurriculumTopic> _curriculumTopics = [];
+  List<String> _testTypeOptions = [];
+  String? _selectedCourse;
+  String? _selectedTopic;
+  String? _selectedTestType;
+  bool _isLoading = true;
+  bool _isSaving = false;
+  bool _isDuplicateLocked = false;
+
+  bool get _isFormLocked => _isSaving || _isDuplicateLocked;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOptions();
+  }
+
+  @override
+  void dispose() {
+    _testNameController.dispose();
+    _correctController.dispose();
+    _wrongController.dispose();
+    _emptyController.dispose();
+    super.dispose();
+  }
+
+  void _showSnackBar(String message, {required Color backgroundColor}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: backgroundColor),
+    );
+  }
+
+  String? get _studentId => FirebaseAuth.instance.currentUser?.uid;
+
+  Future<bool> _hasDuplicateLog({required String testId}) async {
+    final studentId = _studentId;
+    if (studentId == null || testId.isEmpty) {
+      return false;
+    }
+
+    final snapshot = await _firestore
+        .collection('student_exam_logs')
+        .where('student_id', isEqualTo: studentId)
+        .where('test_id', isEqualTo: testId)
+        .limit(1)
+        .get();
+
+    return snapshot.docs.isNotEmpty;
+  }
+
+  Future<void> _saveManualTestEntry() async {
+    final studentId = _studentId;
+    if (studentId == null) {
+      _showSnackBar(
+        'Öğrenci oturumu bulunamadı.',
+        backgroundColor: Colors.red.shade700,
+      );
+      return;
+    }
+
+    final testId = _testNameController.text.trim();
+    if (testId.isEmpty) {
+      _showSnackBar(
+        'Lütfen test adını/ID bilgisini giriniz.',
+        backgroundColor: Colors.orange.shade800,
+      );
+      return;
+    }
+    if (_selectedCourse == null ||
+        _selectedTopic == null ||
+        _selectedTestType == null) {
+      _showSnackBar(
+        'Lütfen ders, konu ve test türü alanlarını doldurunuz.',
+        backgroundColor: Colors.orange.shade800,
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final hasDuplicate = await _hasDuplicateLog(testId: testId);
+      if (hasDuplicate) {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _isDuplicateLocked = true);
+        _showSnackBar(
+          _duplicateErrorText,
+          backgroundColor: Colors.deepOrange.shade700,
+        );
+        return;
+      }
+
+      final payload = {
+        'student_id': studentId,
+        'exam_mode': 'test',
+        'entry_type': 'manuel',
+        'test_id': testId,
+        'test_name': testId,
+        'course_name': _selectedCourse,
+        'topic': _selectedTopic,
+        'test_type': _selectedTestType,
+        'correct_count': int.tryParse(_correctController.text.trim()) ?? 0,
+        'wrong_count': int.tryParse(_wrongController.text.trim()) ?? 0,
+        'empty_count': int.tryParse(_emptyController.text.trim()) ?? 0,
+        'created_at': FieldValue.serverTimestamp(),
+      };
+
+      await _firestore.collection('student_exam_logs').add(payload);
+
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isDuplicateLocked = true);
+      _showSnackBar(
+        'İşleminiz tamamlandı',
+        backgroundColor: Colors.green.shade700,
+      );
+    } catch (e) {
+      _showSnackBar(
+        'Kayıt sırasında hata oluştu: $e',
+        backgroundColor: Colors.red.shade700,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  Future<void> _loadOptions() async {
+    try {
+      final snapshots = await Future.wait([
+        _firestore.collection('curriculum').get(),
+        _firestore.collection('yks_optikli_test').get(),
+      ]);
+
+      final curriculumSnapshot = snapshots[0];
+      final testTypeSnapshot = snapshots[1];
+
+      final topics = <CurriculumTopic>[];
+      for (final doc in curriculumSnapshot.docs) {
+        final data = doc.data();
+        final isActive = data['is_active'];
+        final isRecordActive =
+            isActive == true || isActive == 'TRUE' || isActive == 'true';
+        if (!isRecordActive) {
+          continue;
+        }
+
+        final code = data['konu_kodu']?.toString().trim() ?? '';
+        final name = data['konu_adi']?.toString().trim() ?? '';
+        final course = data['ders_adi']?.toString().trim() ?? 'Bilinmeyen Ders';
+        if (code.isEmpty && name.isEmpty) {
+          continue;
+        }
+        topics.add(CurriculumTopic(code: code, name: name, courseName: course));
+      }
+
+      final testTypes =
+          testTypeSnapshot.docs
+              .map((doc) => doc.data()['test_turu']?.toString().trim() ?? '')
+              .where((value) => value.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
+
+      topics.sort((a, b) {
+        final byCourse = a.courseName.compareTo(b.courseName);
+        if (byCourse != 0) {
+          return byCourse;
+        }
+        return a.label.compareTo(b.label);
+      });
+
+      if (mounted) {
+        setState(() {
+          _curriculumTopics = topics;
+          _testTypeOptions = testTypes;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showSnackBar(
+          'Ders/Konu bilgileri yüklenemedi.',
+          backgroundColor: Colors.red.shade700,
+        );
+      }
+    }
+  }
+
+  List<String> get _courseOptions =>
+      _curriculumTopics.map((topic) => topic.courseName).toSet().toList()
+        ..sort();
+
+  List<String> get _topicOptions {
+    if (_selectedCourse == null) {
+      return [];
+    }
+    return _curriculumTopics
+        .where((topic) => topic.courseName == _selectedCourse)
+        .map((topic) => topic.label)
+        .toList();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            color: Colors.blue.shade50,
-            child: const TabBar(
-              labelColor: Colors.blueAccent,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: Colors.blueAccent,
-              tabs: [
-                Tab(text: 'Manuel Test Girişi'),
-                Tab(text: 'Optikli Test Girişi'),
-              ],
+          DropdownButtonFormField<String>(
+            initialValue: _selectedCourse,
+            onChanged: _isFormLocked
+                ? null
+                : (value) {
+                    setState(() {
+                      _selectedCourse = value;
+                      _selectedTopic = null;
+                    });
+                  },
+            decoration: const InputDecoration(
+              labelText: 'Ders seçiniz',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+            ),
+            items: _courseOptions
+                .map(
+                  (item) =>
+                      DropdownMenuItem<String>(value: item, child: Text(item)),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _selectedTopic,
+            decoration: const InputDecoration(
+              labelText: 'Konu seçiniz',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+            ),
+            items: _topicOptions
+                .map(
+                  (item) =>
+                      DropdownMenuItem<String>(value: item, child: Text(item)),
+                )
+                .toList(),
+            onChanged: _selectedCourse == null || _isFormLocked
+                ? null
+                : (value) => setState(() => _selectedTopic = value),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _selectedTestType,
+            decoration: const InputDecoration(
+              labelText: 'Test türü',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+            ),
+            items: _testTypeOptions
+                .map(
+                  (item) =>
+                      DropdownMenuItem<String>(value: item, child: Text(item)),
+                )
+                .toList(),
+            onChanged: _isFormLocked
+                ? null
+                : (value) => setState(() => _selectedTestType = value),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _testNameController,
+            enabled: !_isFormLocked,
+            decoration: const InputDecoration(
+              labelText: 'Test adı / ID',
+              border: OutlineInputBorder(),
             ),
           ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _buildManualTestTab(),
-                _buildOpticTestTab(),
-              ],
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: NumericInputField(
+                  label: 'D',
+                  controller: _correctController,
+                  enabled: !_isFormLocked,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: NumericInputField(
+                  label: 'Y',
+                  controller: _wrongController,
+                  enabled: !_isFormLocked,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: NumericInputField(
+                  label: 'B',
+                  controller: _emptyController,
+                  enabled: !_isFormLocked,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: _isFormLocked ? null : _saveManualTestEntry,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blueGrey.shade900,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
+            child: Text(_isSaving ? 'Kaydediliyor...' : 'SİSTEME KAYDET'),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildManualTestTab() {
+class CurriculumTopic {
+  final String code;
+  final String name;
+  final String courseName;
+
+  const CurriculumTopic({
+    required this.code,
+    required this.name,
+    required this.courseName,
+  });
+
+  String get label => '$code $name';
+}
+
+class _LessonScoreEntry {
+  final String title;
+  final TextEditingController dController = TextEditingController();
+  final TextEditingController yController = TextEditingController();
+  final TextEditingController bController = TextEditingController();
+
+  _LessonScoreEntry(this.title);
+
+  Map<String, dynamic> toMap() {
+    return {
+      'lesson_title': title,
+      'correct': int.tryParse(dController.text.trim()) ?? 0,
+      'wrong': int.tryParse(yController.text.trim()) ?? 0,
+      'empty': int.tryParse(bController.text.trim()) ?? 0,
+    };
+  }
+
+  void dispose() {
+    dController.dispose();
+    yController.dispose();
+    bController.dispose();
+  }
+}
+
+class _WrongTopicEntry {
+  String? selectedTopicLabel;
+  final TextEditingController countController = TextEditingController();
+
+  Map<String, dynamic> toMap() {
+    return {
+      'topic': selectedTopicLabel ?? '',
+      'count': int.tryParse(countController.text.trim()) ?? 0,
+    };
+  }
+
+  void dispose() {
+    countController.dispose();
+  }
+}
+
+class ManualPracticeExamEntryTab extends StatefulWidget {
+  const ManualPracticeExamEntryTab({super.key});
+
+  @override
+  State<ManualPracticeExamEntryTab> createState() =>
+      _ManualPracticeExamEntryTabState();
+}
+
+class _ManualPracticeExamEntryTabState
+    extends State<ManualPracticeExamEntryTab> {
+  static const String _duplicateErrorText =
+      'Hata: Bu testi/denemeyi daha önce çözmüşsünüz. Mükerrer kayıt yapılamaz.';
+
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final TextEditingController _denemeInfoController = TextEditingController();
+  final TextEditingController _timeNotSeenController = TextEditingController();
+
+  final List<_LessonScoreEntry> _lessonRows = [
+    _LessonScoreEntry('TYT Türkçe (40 soru)'),
+    _LessonScoreEntry('TYT Sosyal (20 soru)'),
+    _LessonScoreEntry('TYT Matematik (40 soru)'),
+    _LessonScoreEntry('TYT Fen (20 soru)'),
+  ];
+
+  final List<_WrongTopicEntry> _wrongTopicRows = [_WrongTopicEntry()];
+
+  List<CurriculumTopic> _curriculumTopics = [];
+  String? _selectedDenemeType;
+  bool _isLoadingTopics = true;
+  bool _isSaving = false;
+  bool _isDuplicateLocked = false;
+
+  bool get _isFormLocked => _isSaving || _isDuplicateLocked;
+
+  List<CurriculumTopic> get _filteredCurriculumTopics {
+    final examType = (_selectedDenemeType ?? '').toUpperCase();
+    if (examType == 'TYT' || examType == 'LGS') {
+      return _curriculumTopics.where((topic) {
+        final code = topic.code.toUpperCase();
+        return code.startsWith('T_') ||
+            code.startsWith('Y_') ||
+            code.startsWith('L_');
+      }).toList();
+    }
+    if (examType == 'AYT') {
+      return _curriculumTopics
+          .where((topic) => topic.code.toUpperCase().startsWith('A_'))
+          .toList();
+    }
+    return _curriculumTopics;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurriculumTopics();
+  }
+
+  @override
+  void dispose() {
+    _denemeInfoController.dispose();
+    _timeNotSeenController.dispose();
+    for (final lesson in _lessonRows) {
+      lesson.dispose();
+    }
+    for (final topic in _wrongTopicRows) {
+      topic.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _loadCurriculumTopics() async {
+    try {
+      final snapshot = await _firestore.collection('curriculum').get();
+      final topics = <CurriculumTopic>[];
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final isActive = data['is_active'];
+        final isRecordActive =
+            isActive == true || isActive == 'TRUE' || isActive == 'true';
+        if (!isRecordActive) {
+          continue;
+        }
+
+        final code = data['konu_kodu']?.toString().trim() ?? '';
+        final name = data['konu_adi']?.toString().trim() ?? '';
+        final course = data['ders_adi']?.toString().trim() ?? 'Bilinmeyen Ders';
+        if (code.isEmpty && name.isEmpty) {
+          continue;
+        }
+        topics.add(CurriculumTopic(code: code, name: name, courseName: course));
+      }
+
+      topics.sort((a, b) => a.label.compareTo(b.label));
+
+      if (mounted) {
+        setState(() {
+          _curriculumTopics = topics;
+          _isLoadingTopics = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingTopics = false);
+        _showSnackBar(
+          'Konu listesi yüklenemedi.',
+          backgroundColor: Colors.red.shade700,
+        );
+      }
+    }
+  }
+
+  void _showSnackBar(String message, {required Color backgroundColor}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: backgroundColor),
+    );
+  }
+
+  String? get _studentId => FirebaseAuth.instance.currentUser?.uid;
+
+  Future<bool> _hasDuplicateLog({required String testId}) async {
+    final studentId = _studentId;
+    if (studentId == null || testId.isEmpty) {
+      return false;
+    }
+
+    final snapshot = await _firestore
+        .collection('student_exam_logs')
+        .where('student_id', isEqualTo: studentId)
+        .where('test_id', isEqualTo: testId)
+        .limit(1)
+        .get();
+
+    return snapshot.docs.isNotEmpty;
+  }
+
+  Future<void> _saveManualEntry() async {
+    final studentId = _studentId;
+    if (studentId == null) {
+      _showSnackBar(
+        'Öğrenci oturumu bulunamadı.',
+        backgroundColor: Colors.red.shade700,
+      );
+      return;
+    }
+
+    final testId = _denemeInfoController.text.trim();
+    if (testId.isEmpty) {
+      _showSnackBar(
+        'Lütfen deneme bilgisini giriniz.',
+        backgroundColor: Colors.orange.shade800,
+      );
+      return;
+    }
+
+    if (_selectedDenemeType == null || _selectedDenemeType!.isEmpty) {
+      _showSnackBar(
+        'Lütfen deneme türünü seçiniz.',
+        backgroundColor: Colors.orange.shade800,
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final hasDuplicate = await _hasDuplicateLog(testId: testId);
+      if (hasDuplicate) {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _isDuplicateLocked = true);
+        _showSnackBar(
+          _duplicateErrorText,
+          backgroundColor: Colors.deepOrange.shade700,
+        );
+        return;
+      }
+
+      final payload = {
+        'student_id': studentId,
+        'exam_mode': 'deneme',
+        'entry_type': 'manuel',
+        'test_id': testId,
+        'test_name': testId,
+        'exam_type': _selectedDenemeType,
+        'time_not_seen_count':
+            int.tryParse(_timeNotSeenController.text.trim()) ?? 0,
+        'lesson_results': _lessonRows.map((row) => row.toMap()).toList(),
+        'wrong_topics': _wrongTopicRows
+            .map((row) => row.toMap())
+            .where(
+              (row) =>
+                  (row['topic'] as String).trim().isNotEmpty ||
+                  (row['count'] as int) > 0,
+            )
+            .toList(),
+        'created_at': FieldValue.serverTimestamp(),
+      };
+
+      await _firestore.collection('student_exam_logs').add(payload);
+
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isDuplicateLocked = true);
+      _showSnackBar(
+        'İşleminiz tamamlandı',
+        backgroundColor: Colors.green.shade700,
+      );
+    } catch (e) {
+      _showSnackBar(
+        'Kayıt sırasında hata oluştu: $e',
+        backgroundColor: Colors.red.shade700,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const CustomDropdown(hint: 'Ders seçiniz'),
-          const SizedBox(height: 12),
-          const CustomDropdown(hint: 'Önce ders seçiniz (Konu)'),
-          const SizedBox(height: 12),
-          const CustomDropdown(hint: 'Test türü'),
-          const SizedBox(height: 24),
-          
-          Row(
-            children: const [
-              Expanded(child: NumericInputField(label: 'D')),
-              SizedBox(width: 12),
-              Expanded(child: NumericInputField(label: 'Y')),
-              SizedBox(width: 12),
-              Expanded(child: NumericInputField(label: 'B')),
-            ],
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueGrey.shade900,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16)
+          TextFormField(
+            controller: _denemeInfoController,
+            enabled: !_isFormLocked,
+            decoration: const InputDecoration(
+              labelText: 'Deneme bilgisi. Örn: DST2601',
+              border: OutlineInputBorder(),
             ),
-            child: const Text('KAYDET'),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _selectedDenemeType,
+            decoration: const InputDecoration(
+              labelText: 'Deneme türünü seçiniz. Örn: TYT',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'TYT', child: Text('TYT')),
+              DropdownMenuItem(value: 'AYT', child: Text('AYT')),
+              DropdownMenuItem(value: 'YDT', child: Text('YDT')),
+              DropdownMenuItem(value: 'LGS', child: Text('LGS')),
+            ],
+            onChanged: _isFormLocked
+                ? null
+                : (value) {
+                    setState(() {
+                      _selectedDenemeType = value;
+                      for (final row in _wrongTopicRows) {
+                        row.selectedTopicLabel = null;
+                      }
+                    });
+                  },
+          ),
+          const SizedBox(height: 24),
+          ..._lessonRows.map(
+            (row) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildLessonManualRow(
+                title: row.title,
+                dController: row.dController,
+                yController: row.yController,
+                bController: row.bController,
+                enabled: !_isFormLocked,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          NumericInputField(
+            label: 'Süre yetmediği için görülemeyen soru sayısı',
+            controller: _timeNotSeenController,
+            enabled: !_isFormLocked,
+          ),
+          const SizedBox(height: 24),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade400),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  color: Colors.grey.shade200,
+                  padding: const EdgeInsets.all(8),
+                  child: const Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          'Doğru yapılamayan sorular alanı / Konu Kodu ve Adı',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'Soru Sayısı',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_isLoadingTopics)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: CircularProgressIndicator(),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _wrongTopicRows.length,
+                    itemBuilder: (context, index) {
+                      final row = _wrongTopicRows[index];
+                      return Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: DropdownButtonFormField<String>(
+                                initialValue: row.selectedTopicLabel,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Konu seçiniz',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: _filteredCurriculumTopics
+                                    .map(
+                                      (topic) => DropdownMenuItem<String>(
+                                        value: topic.label,
+                                        child: Text(topic.label),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: _isFormLocked
+                                    ? null
+                                    : (value) => setState(
+                                        () => row.selectedTopicLabel = value,
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 1,
+                              child: NumericInputField(
+                                label: 'Adet',
+                                controller: row.countController,
+                                enabled: !_isFormLocked,
+                              ),
+                            ),
+                            if (index > 0) ...[
+                              const SizedBox(width: 6),
+                              IconButton(
+                                icon: const Icon(Icons.delete),
+                                tooltip: 'Satırı sil',
+                                onPressed: _isFormLocked
+                                    ? null
+                                    : () {
+                                        setState(() {
+                                          final removed = _wrongTopicRows
+                                              .removeAt(index);
+                                          removed.dispose();
+                                        });
+                                      },
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                if (!_isLoadingTopics)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: _isFormLocked
+                            ? null
+                            : () {
+                                setState(() {
+                                  _wrongTopicRows.add(_WrongTopicEntry());
+                                });
+                              },
+                        icon: const Icon(Icons.add),
+                        label: const Text('+ Yeni Konu Ekle'),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _isFormLocked ? null : _saveManualEntry,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: Text(_isSaving ? 'Kaydediliyor...' : 'SİSTEME KAYDET'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildOpticTestTab() {
-    return const OpticTestTab();
+  Widget _buildLessonManualRow({
+    required String title,
+    required TextEditingController dController,
+    required TextEditingController yController,
+    required TextEditingController bController,
+    required bool enabled,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ),
+        Expanded(
+          flex: 1,
+          child: NumericInputField(
+            label: 'D',
+            controller: dController,
+            enabled: enabled,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 1,
+          child: NumericInputField(
+            label: 'Y',
+            controller: yController,
+            enabled: enabled,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 1,
+          child: NumericInputField(
+            label: 'B',
+            controller: bController,
+            enabled: enabled,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -201,14 +1061,13 @@ class OpticTestData {
   });
 
   factory OpticTestData.fromMap(Map<String, dynamic> map) {
-    List<String> extractedAnswers = [];
-    // Tablodaki '1', '2', '3' ... '120' arasi sutun basliklarini tarar
+    final extractedAnswers = <String>[];
     for (int i = 1; i <= 120; i++) {
       final val = map[i.toString()]?.toString().trim();
       if (val != null && val.isNotEmpty) {
         extractedAnswers.add(val);
       } else {
-        break; // Bos hucre gorunce (sorular bitince) donguyu kirar
+        break;
       }
     }
 
@@ -231,8 +1090,13 @@ class OpticTestTab extends StatefulWidget {
 }
 
 class _OpticTestTabState extends State<OpticTestTab> {
-  static const String _testCollectionName = '[TEST_KOLEKSIYON_ADI]';
+  static const String _duplicateErrorText =
+      'Hata: Bu testi/denemeyi daha önce çözmüşsünüz. Mükerrer kayıt yapılamaz.';
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  List<CurriculumTopic> _curriculumTopics = [];
+
+  String? _selectedCourse;
   String? _selectedTestTuru;
   String? _selectedYayinAdi;
   String? _selectedSeri;
@@ -241,11 +1105,18 @@ class _OpticTestTabState extends State<OpticTestTab> {
   OpticTestData? _selectedTest;
   List<OpticTestData> _testList = [];
   List<String?> _selectedAnswers = [];
+
   bool _isLoading = true;
+  bool _isSaving = false;
+  bool _isInputLocked = false;
+  bool _isDuplicateLocked = false;
   bool isChecked = false;
+
   int correctCount = 0;
   int wrongCount = 0;
   int emptyCount = 0;
+
+  bool get _isFormLocked => _isInputLocked || _isDuplicateLocked || _isSaving;
 
   @override
   void initState() {
@@ -253,44 +1124,84 @@ class _OpticTestTabState extends State<OpticTestTab> {
     _loadTests();
   }
 
+  void _showSnackBar(String message, {required Color backgroundColor}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: backgroundColor),
+    );
+  }
+
+  String? get _studentId => FirebaseAuth.instance.currentUser?.uid;
+
   Future<void> _loadTests() async {
     try {
-      final snapshot = await _firestore.collection('yks_optikli_test').get();
-      final loadedTests = snapshot.docs.map((doc) {
+      final snapshots = await Future.wait([
+        _firestore.collection('yks_optikli_test').get(),
+        _firestore.collection('curriculum').get(),
+      ]);
+
+      final snapshot = snapshots[0];
+      final curriculumSnapshot = snapshots[1];
+
+      final loadedTests = snapshot.docs
+          .map((doc) {
+            final data = doc.data();
+            final parsed = OpticTestData.fromMap(data);
+            return OpticTestData(
+              testTuru: parsed.testTuru,
+              yayinAdi: parsed.yayinAdi,
+              seri: parsed.seri,
+              konuKoduAdi: parsed.konuKoduAdi,
+              testAdi: parsed.testAdi.isEmpty ? doc.id : parsed.testAdi,
+              answers: parsed.answers,
+            );
+          })
+          .where((e) => e.testAdi.isNotEmpty)
+          .toList();
+
+      final topics = <CurriculumTopic>[];
+      for (final doc in curriculumSnapshot.docs) {
         final data = doc.data();
-        final parsed = OpticTestData.fromMap(data);
-        return OpticTestData(
-          testTuru: parsed.testTuru,
-          yayinAdi: parsed.yayinAdi,
-          seri: parsed.seri,
-          konuKoduAdi: parsed.konuKoduAdi,
-          testAdi: parsed.testAdi.isEmpty ? doc.id : parsed.testAdi,
-          answers: parsed.answers,
-        );
-      }).where((e) => e.testAdi.isNotEmpty).toList();
+        final isActive = data['is_active'];
+        final isRecordActive =
+            isActive == true || isActive == 'TRUE' || isActive == 'true';
+        if (!isRecordActive) {
+          continue;
+        }
+
+        final code = data['konu_kodu']?.toString().trim() ?? '';
+        final name = data['konu_adi']?.toString().trim() ?? '';
+        final course = data['ders_adi']?.toString().trim() ?? 'Bilinmeyen Ders';
+        if (code.isEmpty && name.isEmpty) {
+          continue;
+        }
+        topics.add(CurriculumTopic(code: code, name: name, courseName: course));
+      }
 
       if (mounted) {
         setState(() {
           _testList = loadedTests;
+          _curriculumTopics = topics;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Testler yuklenemedi: $e')),
+        _showSnackBar(
+          'Testler yüklenemedi: $e',
+          backgroundColor: Colors.red.shade700,
         );
       }
     }
   }
 
-  List<String> get _testTurleri {
-    return _testList.map((e) => e.testTuru).toSet().toList();
-  }
+  List<String> get _testTurleri =>
+      _testList.map((e) => e.testTuru).toSet().toList();
 
   List<String> get _yayinAdlari {
-    if (_selectedTestTuru == null) return [];
+    if (_selectedTestTuru == null) {
+      return [];
+    }
     return _testList
         .where((e) => e.testTuru == _selectedTestTuru)
         .map((e) => e.yayinAdi)
@@ -299,27 +1210,69 @@ class _OpticTestTabState extends State<OpticTestTab> {
   }
 
   List<String> get _seriListesi {
-    if (_selectedTestTuru == null || _selectedYayinAdi == null) return [];
+    if (_selectedTestTuru == null || _selectedYayinAdi == null) {
+      return [];
+    }
     return _testList
-        .where((e) => e.testTuru == _selectedTestTuru && e.yayinAdi == _selectedYayinAdi)
+        .where(
+          (e) =>
+              e.testTuru == _selectedTestTuru &&
+              e.yayinAdi == _selectedYayinAdi,
+        )
         .map((e) => e.seri)
         .toSet()
         .toList();
   }
 
   List<String> get _konuKodlari {
-    if (_selectedTestTuru == null || _selectedYayinAdi == null || _selectedSeri == null) return [];
+    if (_selectedTestTuru == null ||
+        _selectedYayinAdi == null ||
+        _selectedSeri == null) {
+      return [];
+    }
+
+    final selectedCourseCodes = _curriculumTopics
+        .where((topic) => topic.courseName == _selectedCourse)
+        .map((topic) => topic.code)
+        .toSet();
+
     return _testList
-        .where((e) => e.testTuru == _selectedTestTuru && e.yayinAdi == _selectedYayinAdi && e.seri == _selectedSeri)
+        .where(
+          (e) =>
+              e.testTuru == _selectedTestTuru &&
+              e.yayinAdi == _selectedYayinAdi &&
+              e.seri == _selectedSeri &&
+              (_selectedCourse == null ||
+                  selectedCourseCodes.any(
+                    (code) => e.konuKoduAdi.toUpperCase().contains(
+                      code.toUpperCase(),
+                    ),
+                  )),
+        )
         .map((e) => e.konuKoduAdi)
         .toSet()
         .toList();
   }
 
+  List<String> get _courseOptions =>
+      _curriculumTopics.map((topic) => topic.courseName).toSet().toList()
+        ..sort();
+
   List<String> get _testAdlari {
-    if (_selectedTestTuru == null || _selectedYayinAdi == null || _selectedSeri == null || _selectedKonuKoduAdi == null) return [];
+    if (_selectedTestTuru == null ||
+        _selectedYayinAdi == null ||
+        _selectedSeri == null ||
+        _selectedKonuKoduAdi == null) {
+      return [];
+    }
     return _testList
-        .where((e) => e.testTuru == _selectedTestTuru && e.yayinAdi == _selectedYayinAdi && e.seri == _selectedSeri && e.konuKoduAdi == _selectedKonuKoduAdi)
+        .where(
+          (e) =>
+              e.testTuru == _selectedTestTuru &&
+              e.yayinAdi == _selectedYayinAdi &&
+              e.seri == _selectedSeri &&
+              e.konuKoduAdi == _selectedKonuKoduAdi,
+        )
         .map((e) => e.testAdi)
         .toSet()
         .toList();
@@ -341,6 +1294,7 @@ class _OpticTestTabState extends State<OpticTestTab> {
         _selectedTest = null;
         break;
       case 3:
+        _selectedCourse = null;
         _selectedKonuKoduAdi = null;
         _selectedTestAdi = null;
         _selectedTest = null;
@@ -352,8 +1306,11 @@ class _OpticTestTabState extends State<OpticTestTab> {
       default:
         break;
     }
+
     _selectedAnswers = [];
     isChecked = false;
+    _isInputLocked = false;
+    _isDuplicateLocked = false;
     correctCount = 0;
     wrongCount = 0;
     emptyCount = 0;
@@ -369,10 +1326,35 @@ class _OpticTestTabState extends State<OpticTestTab> {
 
     final found = _testList.where((e) => e.testAdi == value).toList();
     _selectedTest = found.isNotEmpty ? found.first : null;
-    _selectedAnswers = List<String?>.filled(_selectedTest?.answers.length ?? 0, null);
+    _selectedAnswers = List<String?>.filled(
+      _selectedTest?.answers.length ?? 0,
+      null,
+    );
+    _isInputLocked = false;
+    _isDuplicateLocked = false;
+    isChecked = false;
+  }
+
+  Future<bool> _hasDuplicateLog({required String testId}) async {
+    final studentId = _studentId;
+    if (studentId == null || testId.isEmpty) {
+      return false;
+    }
+
+    final snapshot = await _firestore
+        .collection('student_exam_logs')
+        .where('student_id', isEqualTo: studentId)
+        .where('test_id', isEqualTo: testId)
+        .limit(1)
+        .get();
+
+    return snapshot.docs.isNotEmpty;
   }
 
   void _toggleAnswer(int index, String option) {
+    if (_isFormLocked) {
+      return;
+    }
     setState(() {
       if (_selectedAnswers[index] == option) {
         _selectedAnswers[index] = null;
@@ -382,9 +1364,53 @@ class _OpticTestTabState extends State<OpticTestTab> {
     });
   }
 
-  void _checkAnswers() {
+  Future<void> _checkAnswers() async {
     if (_selectedTest == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lütfen önce bir test seçiniz.')));
+      _showSnackBar(
+        'Lütfen önce bir test seçiniz.',
+        backgroundColor: Colors.orange.shade800,
+      );
+      return;
+    }
+
+    final hasDuplicate = await _hasDuplicateLog(testId: _selectedTest!.testAdi);
+    if (hasDuplicate) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isDuplicateLocked = true);
+      _showSnackBar(
+        _duplicateErrorText,
+        backgroundColor: Colors.deepOrange.shade700,
+      );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Onay'),
+          content: const Text('Emin misin? İşlem geri alınamaz.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Evet'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
       return;
     }
 
@@ -393,53 +1419,138 @@ class _OpticTestTabState extends State<OpticTestTab> {
     final correct = List.generate(totalQuestions, (index) {
       final answer = _selectedAnswers[index];
       return answer != null && answer == _selectedTest!.answers[index] ? 1 : 0;
-    }).fold(0, (sum, value) => sum + value);
+    }).fold<int>(0, (acc, item) => acc + item);
+
     final empty = totalQuestions - answeredCount;
     final wrong = answeredCount - correct;
 
     setState(() {
       isChecked = true;
+      _isInputLocked = true;
       correctCount = correct;
       wrongCount = wrong;
       emptyCount = empty;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Yanıtlanan: $answeredCount, Doğru: $correct / $totalQuestions'),
-    ));
+    _showSnackBar(
+      'Kontrol tamamlandı: D:$correct, Y:$wrong, B:$empty, Toplam:$totalQuestions',
+      backgroundColor: Colors.blue.shade700,
+    );
   }
 
-  void _saveOpticTestResult() {
-    if (!isChecked) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Optik test sonucu sisteme kaydedildi.')));
+  Future<void> _saveOpticTestResult() async {
+    if (!isChecked || _selectedTest == null) {
+      return;
+    }
+
+    final studentId = _studentId;
+    if (studentId == null) {
+      _showSnackBar(
+        'Öğrenci oturumu bulunamadı.',
+        backgroundColor: Colors.red.shade700,
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final hasDuplicate = await _hasDuplicateLog(
+        testId: _selectedTest!.testAdi,
+      );
+      if (hasDuplicate) {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _isDuplicateLocked = true);
+        _showSnackBar(
+          _duplicateErrorText,
+          backgroundColor: Colors.deepOrange.shade700,
+        );
+        return;
+      }
+
+      await _firestore.collection('student_exam_logs').add({
+        'student_id': studentId,
+        'exam_mode': 'test',
+        'entry_type': 'optikli',
+        'test_id': _selectedTest!.testAdi,
+        'test_name': _selectedTest!.testAdi,
+        'test_turu': _selectedTestTuru,
+        'yayin_adi': _selectedYayinAdi,
+        'seri': _selectedSeri,
+        'konu_kodu_adi': _selectedKonuKoduAdi,
+        'correct_count': correctCount,
+        'wrong_count': wrongCount,
+        'empty_count': emptyCount,
+        'question_count': _selectedTest!.answers.length,
+        'selected_answers': _selectedAnswers,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isDuplicateLocked = true);
+      _showSnackBar(
+        'İşleminiz tamamlandı',
+        backgroundColor: Colors.green.shade700,
+      );
+    } catch (e) {
+      _showSnackBar(
+        'Kayıt sırasında hata oluştu: $e',
+        backgroundColor: Colors.red.shade700,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   Widget _buildResultPill(String title, String value, Color color) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: TextStyle(fontSize: 14, color: color, fontWeight: FontWeight.w700)),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
       ],
     );
   }
 
   Widget _buildDropdownField({
     required String label,
-    required String? initialValue,
+    required String? value,
     required List<String> items,
     required bool enabled,
     required ValueChanged<String?> onChanged,
   }) {
     return DropdownButtonFormField<String>(
-      initialValue: initialValue,
+      initialValue: value,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 16,
+        ),
       ),
-      items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+      items: items
+          .map(
+            (item) => DropdownMenuItem<String>(value: item, child: Text(item)),
+          )
+          .toList(),
       onChanged: enabled ? onChanged : null,
     );
   }
@@ -459,9 +1570,9 @@ class _OpticTestTabState extends State<OpticTestTab> {
         children: [
           _buildDropdownField(
             label: 'Test Türü Seçiniz',
-            initialValue: _selectedTestTuru,
+            value: _selectedTestTuru,
             items: _testTurleri,
-            enabled: true,
+            enabled: !_isFormLocked,
             onChanged: (value) {
               setState(() {
                 _selectedTestTuru = value;
@@ -472,9 +1583,9 @@ class _OpticTestTabState extends State<OpticTestTab> {
           const SizedBox(height: 12),
           _buildDropdownField(
             label: 'Yayın Adı Seçiniz',
-            initialValue: _selectedYayinAdi,
+            value: _selectedYayinAdi,
             items: _yayinAdlari,
-            enabled: _selectedTestTuru != null,
+            enabled: _selectedTestTuru != null && !_isFormLocked,
             onChanged: (value) {
               setState(() {
                 _selectedYayinAdi = value;
@@ -485,9 +1596,9 @@ class _OpticTestTabState extends State<OpticTestTab> {
           const SizedBox(height: 12),
           _buildDropdownField(
             label: 'Seri Seçiniz',
-            initialValue: _selectedSeri,
+            value: _selectedSeri,
             items: _seriListesi,
-            enabled: _selectedYayinAdi != null,
+            enabled: _selectedYayinAdi != null && !_isFormLocked,
             onChanged: (value) {
               setState(() {
                 _selectedSeri = value;
@@ -497,10 +1608,26 @@ class _OpticTestTabState extends State<OpticTestTab> {
           ),
           const SizedBox(height: 12),
           _buildDropdownField(
+            label: 'Ders Seçiniz',
+            value: _selectedCourse,
+            items: _courseOptions,
+            enabled: _selectedSeri != null && !_isFormLocked,
+            onChanged: (value) {
+              setState(() {
+                _selectedCourse = value;
+                _resetBelow(level: 4);
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          _buildDropdownField(
             label: 'Konu Kodu ve Adı Seçiniz',
-            initialValue: _selectedKonuKoduAdi,
+            value: _selectedKonuKoduAdi,
             items: _konuKodlari,
-            enabled: _selectedSeri != null,
+            enabled:
+                _selectedSeri != null &&
+                _selectedCourse != null &&
+                !_isFormLocked,
             onChanged: (value) {
               setState(() {
                 _selectedKonuKoduAdi = value;
@@ -511,9 +1638,9 @@ class _OpticTestTabState extends State<OpticTestTab> {
           const SizedBox(height: 12),
           _buildDropdownField(
             label: 'Test Adı Seçiniz',
-            initialValue: _selectedTestAdi,
+            value: _selectedTestAdi,
             items: _testAdlari,
-            enabled: _selectedKonuKoduAdi != null,
+            enabled: _selectedKonuKoduAdi != null && !_isFormLocked,
             onChanged: (value) {
               setState(() {
                 _selectTestAdi(value);
@@ -531,11 +1658,21 @@ class _OpticTestTabState extends State<OpticTestTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Seçilen Test', style: TextStyle(fontSize: 16, color: colorScheme.primary, fontWeight: FontWeight.w700)),
+                Text(
+                  'Seçilen Test',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Text(
                   _selectedTest?.testAdi ?? 'Henüz test seçilmedi',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -555,13 +1692,31 @@ class _OpticTestTabState extends State<OpticTestTab> {
               child: Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 16,
+                    ),
                     color: Colors.grey.shade200,
                     child: Row(
                       children: [
-                        const Expanded(flex: 2, child: Text('Soru No', style: TextStyle(fontWeight: FontWeight.bold))),
+                        const Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Soru No',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
                         ...['A', 'B', 'C', 'D', 'E'].map(
-                          (e) => Expanded(child: Center(child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold)))),
+                          (e) => Expanded(
+                            child: Center(
+                              child: Text(
+                                e,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -572,26 +1727,54 @@ class _OpticTestTabState extends State<OpticTestTab> {
                     itemCount: _selectedTest!.answers.length,
                     itemBuilder: (context, index) {
                       return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8.0,
+                          horizontal: 12.0,
+                        ),
                         child: Row(
                           children: [
-                            Expanded(flex: 2, child: Text('${index + 1}. soru', style: const TextStyle(fontWeight: FontWeight.w500))),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                '${index + 1}. soru',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
                             ...['A', 'B', 'C', 'D', 'E'].map((option) {
-                              final isSelected = _selectedAnswers[index] == option;
+                              final isSelected =
+                                  _selectedAnswers[index] == option;
                               return Expanded(
                                 child: Center(
                                   child: GestureDetector(
-                                    onTap: () => _toggleAnswer(index, option),
+                                    onTap: _isFormLocked
+                                        ? null
+                                        : () => _toggleAnswer(index, option),
                                     child: Container(
                                       width: 40,
                                       height: 40,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        color: isSelected ? colorScheme.primary : Colors.transparent,
-                                        border: Border.all(color: isSelected ? colorScheme.primary : Colors.grey.shade400),
+                                        color: isSelected
+                                            ? colorScheme.primary
+                                            : Colors.transparent,
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? colorScheme.primary
+                                              : Colors.grey.shade400,
+                                        ),
                                       ),
                                       alignment: Alignment.center,
-                                      child: Text(option, style: TextStyle(color: isSelected ? colorScheme.onPrimary : Colors.black, fontWeight: FontWeight.bold)),
+                                      child: Text(
+                                        option,
+                                        style: TextStyle(
+                                          color: isSelected
+                                              ? colorScheme.onPrimary
+                                              : Colors.black,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -607,180 +1790,74 @@ class _OpticTestTabState extends State<OpticTestTab> {
             ),
             const SizedBox(height: 20),
             OutlinedButton(
-              onPressed: _checkAnswers,
+              onPressed: _isSaving
+                  ? null
+                  : (isChecked ? _saveOpticTestResult : _checkAnswers),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                side: BorderSide(color: colorScheme.primary),
+                side: BorderSide(
+                  color: isChecked
+                      ? Colors.green.shade700
+                      : colorScheme.primary,
+                ),
+                foregroundColor: isChecked
+                    ? Colors.green.shade700
+                    : colorScheme.primary,
               ),
-              child: const Text('KONTROL ET'),
+              child: Text(
+                _isSaving
+                    ? 'Kaydediliyor...'
+                    : (isChecked ? 'SİSTEME KAYDET' : 'KONTROL ET'),
+              ),
             ),
             if (isChecked) ...[
               const SizedBox(height: 16),
               Card(
                 margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
                 elevation: 1,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Wrap(
+                    spacing: 20,
+                    runSpacing: 12,
                     children: [
-                      _buildResultPill('Doğru', correctCount.toString(), colorScheme.primary),
-                      _buildResultPill('Yanlış', wrongCount.toString(), Colors.red.shade700),
-                      _buildResultPill('Boş', emptyCount.toString(), Colors.grey.shade600),
+                      _buildResultPill(
+                        'Doğru',
+                        correctCount.toString(),
+                        colorScheme.primary,
+                      ),
+                      _buildResultPill(
+                        'Yanlış',
+                        wrongCount.toString(),
+                        Colors.red.shade700,
+                      ),
+                      _buildResultPill(
+                        'Boş',
+                        emptyCount.toString(),
+                        Colors.grey.shade600,
+                      ),
+                      _buildResultPill(
+                        'Toplam Soru',
+                        _selectedTest!.answers.length.toString(),
+                        Colors.blueGrey.shade700,
+                      ),
                     ],
                   ),
                 ),
-              ),
-              ElevatedButton(
-                onPressed: isChecked ? _saveOpticTestResult : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isChecked ? colorScheme.primary : Colors.grey,
-                  foregroundColor: colorScheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text('SİSTEME KAYDET'),
-              ),
-            ] else ...[
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text('SİSTEME KAYDET'),
               ),
             ],
           ] else ...[
             const SizedBox(height: 24),
-            const Text('Test seçildikten sonra optik form burada oluşturulacaktır.', textAlign: TextAlign.center),
+            const Text(
+              'Test seçildikten sonra optik form burada oluşturulacaktır.',
+              textAlign: TextAlign.center,
+            ),
           ],
         ],
       ),
-    );
-  }
-}
-
-// ==========================================
-// EKRAN 2: DENEME GİRİŞLERİ ALANI
-// ==========================================
-class PracticeExamEntryScreen extends StatelessWidget {
-  const PracticeExamEntryScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
-          Container(
-            color: Colors.teal.shade50,
-            child: const TabBar(
-              labelColor: Colors.teal,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: Colors.teal,
-              tabs: [
-                Tab(text: 'Manuel Deneme Girişi'),
-                Tab(text: 'Optikli Deneme Girişi'),
-              ],
-            ),
-          ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _buildManualExamTab(),
-                const PracticeOpticExamTab(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildManualExamTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextFormField(
-            decoration: const InputDecoration(labelText: 'Deneme bilgisi. Örn: DST2601', border: OutlineInputBorder()),
-          ),
-          const SizedBox(height: 12),
-          const CustomDropdown(hint: 'Deneme türünü seçiniz. Örn: TYT'),
-          const SizedBox(height: 24),
-          
-          _buildLessonManualRow('TYT Türkçe (40 soru)'),
-          const SizedBox(height: 8),
-          _buildLessonManualRow('TYT Sosyal (20 soru)'),
-          const SizedBox(height: 8),
-          _buildLessonManualRow('TYT Matematik (40 soru)'),
-          const SizedBox(height: 8),
-          _buildLessonManualRow('TYT Fen (20 soru)'),
-          
-          const SizedBox(height: 24),
-          // 2 hane sınırlandırılmış süre yetmediği alanı
-          const NumericInputField(label: 'Süre yetmediği için görülemeyen soru sayısı'),
-          const SizedBox(height: 24),
-          
-          Container(
-            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400)),
-            child: Column(
-              children: [
-                Container(
-                  color: Colors.grey.shade200,
-                  padding: const EdgeInsets.all(8),
-                  child: const Row(
-                    children: [
-                      Expanded(flex: 2, child: Text('Doğru yapılamayan sorular alanı / Konu Kodu ve Adı', style: TextStyle(fontWeight: FontWeight.bold))),
-                      Expanded(flex: 1, child: Text('Soru Sayısı', style: TextStyle(fontWeight: FontWeight.bold))),
-                    ],
-                  ),
-                ),
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: 3, // Dinamikleşecek
-                  itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        children: const [
-                          Expanded(flex: 2, child: Text('T-TR-3 Paragraf')),
-                          // Soru sayısı için de 2 hane kuralı uygulandı
-                          Expanded(flex: 1, child: NumericInputField(label: 'Adet')),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-            child: const Text('Girişleri Kaydet'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLessonManualRow(String title) {
-    return Row(
-      children: [
-        Expanded(flex: 2, child: Text(title, style: const TextStyle(fontWeight: FontWeight.w500))),
-        const Expanded(flex: 1, child: NumericInputField(label: 'D')),
-        const SizedBox(width: 8),
-        const Expanded(flex: 1, child: NumericInputField(label: 'Y')),
-        const SizedBox(width: 8),
-        const Expanded(flex: 1, child: NumericInputField(label: 'B')),
-      ],
     );
   }
 }
@@ -803,14 +1880,13 @@ class PracticeOpticExamData {
   });
 
   factory PracticeOpticExamData.fromMap(Map<String, dynamic> map) {
-    List<String> extractedAnswers = [];
-    // Tablodaki 'c_1', 'c_2', 'c_3' ... 'c_120' arasi sutun basliklarini tarar
+    final extractedAnswers = <String>[];
     for (int i = 1; i <= 120; i++) {
       final val = map['c_$i']?.toString().trim();
       if (val != null && val.isNotEmpty) {
         extractedAnswers.add(val);
       } else {
-        break; // Sorular bitince durur
+        break;
       }
     }
 
@@ -833,8 +1909,11 @@ class PracticeOpticExamTab extends StatefulWidget {
 }
 
 class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
-  static const String _denemeCollectionName = '[DENEME_KOLEKSIYON_ADI]';
+  static const String _duplicateErrorText =
+      'Hata: Bu testi/denemeyi daha önce çözmüşsünüz. Mükerrer kayıt yapılamaz.';
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   String? _selectedAltSinavTuru;
   String? _selectedYayinAdi;
   String? _selectedSeri;
@@ -843,11 +1922,18 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
   PracticeOpticExamData? _selectedDeneme;
   List<PracticeOpticExamData> _denemeList = [];
   List<String?> _selectedAnswers = [];
+
   bool _isLoading = true;
+  bool _isSaving = false;
+  bool _isInputLocked = false;
+  bool _isDuplicateLocked = false;
   bool isChecked = false;
+
   int correctCount = 0;
   int wrongCount = 0;
   int emptyCount = 0;
+
+  bool get _isFormLocked => _isInputLocked || _isDuplicateLocked || _isSaving;
 
   @override
   void initState() {
@@ -855,21 +1941,32 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
     _loadDenemeler();
   }
 
+  void _showSnackBar(String message, {required Color backgroundColor}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: backgroundColor),
+    );
+  }
+
+  String? get _studentId => FirebaseAuth.instance.currentUser?.uid;
+
   Future<void> _loadDenemeler() async {
     try {
       final snapshot = await _firestore.collection('yks_optikli_deneme').get();
-      final loadedDenemeler = snapshot.docs.map((doc) {
-        final data = doc.data();
-        final parsed = PracticeOpticExamData.fromMap(data);
-        return PracticeOpticExamData(
-          altSinavTuru: parsed.altSinavTuru,
-          yayinAdi: parsed.yayinAdi,
-          seri: parsed.seri,
-          sayi: parsed.sayi,
-          denemeAdi: parsed.denemeAdi.isEmpty ? doc.id : parsed.denemeAdi,
-          answers: parsed.answers,
-        );
-      }).where((e) => e.denemeAdi.isNotEmpty).toList();
+      final loadedDenemeler = snapshot.docs
+          .map((doc) {
+            final data = doc.data();
+            final parsed = PracticeOpticExamData.fromMap(data);
+            return PracticeOpticExamData(
+              altSinavTuru: parsed.altSinavTuru,
+              yayinAdi: parsed.yayinAdi,
+              seri: parsed.seri,
+              sayi: parsed.sayi,
+              denemeAdi: parsed.denemeAdi.isEmpty ? doc.id : parsed.denemeAdi,
+              answers: parsed.answers,
+            );
+          })
+          .where((e) => e.denemeAdi.isNotEmpty)
+          .toList();
 
       if (mounted) {
         setState(() {
@@ -880,17 +1977,21 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Denemeler yuklenemedi: $e')),
+        _showSnackBar(
+          'Denemeler yüklenemedi: $e',
+          backgroundColor: Colors.red.shade700,
         );
       }
     }
   }
 
-  List<String> get _altSinavTurleri => _denemeList.map((e) => e.altSinavTuru).toSet().toList();
+  List<String> get _altSinavTurleri =>
+      _denemeList.map((e) => e.altSinavTuru).toSet().toList();
 
   List<String> get _yayinAdlari {
-    if (_selectedAltSinavTuru == null) return [];
+    if (_selectedAltSinavTuru == null) {
+      return [];
+    }
     return _denemeList
         .where((e) => e.altSinavTuru == _selectedAltSinavTuru)
         .map((e) => e.yayinAdi)
@@ -899,27 +2000,53 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
   }
 
   List<String> get _seriListesi {
-    if (_selectedAltSinavTuru == null || _selectedYayinAdi == null) return [];
+    if (_selectedAltSinavTuru == null || _selectedYayinAdi == null) {
+      return [];
+    }
     return _denemeList
-        .where((e) => e.altSinavTuru == _selectedAltSinavTuru && e.yayinAdi == _selectedYayinAdi)
+        .where(
+          (e) =>
+              e.altSinavTuru == _selectedAltSinavTuru &&
+              e.yayinAdi == _selectedYayinAdi,
+        )
         .map((e) => e.seri)
         .toSet()
         .toList();
   }
 
   List<String> get _sayiListesi {
-    if (_selectedAltSinavTuru == null || _selectedYayinAdi == null || _selectedSeri == null) return [];
+    if (_selectedAltSinavTuru == null ||
+        _selectedYayinAdi == null ||
+        _selectedSeri == null) {
+      return [];
+    }
     return _denemeList
-        .where((e) => e.altSinavTuru == _selectedAltSinavTuru && e.yayinAdi == _selectedYayinAdi && e.seri == _selectedSeri)
+        .where(
+          (e) =>
+              e.altSinavTuru == _selectedAltSinavTuru &&
+              e.yayinAdi == _selectedYayinAdi &&
+              e.seri == _selectedSeri,
+        )
         .map((e) => e.sayi)
         .toSet()
         .toList();
   }
 
   List<String> get _denemeAdlari {
-    if (_selectedAltSinavTuru == null || _selectedYayinAdi == null || _selectedSeri == null || _selectedSayi == null) return [];
+    if (_selectedAltSinavTuru == null ||
+        _selectedYayinAdi == null ||
+        _selectedSeri == null ||
+        _selectedSayi == null) {
+      return [];
+    }
     return _denemeList
-        .where((e) => e.altSinavTuru == _selectedAltSinavTuru && e.yayinAdi == _selectedYayinAdi && e.seri == _selectedSeri && e.sayi == _selectedSayi)
+        .where(
+          (e) =>
+              e.altSinavTuru == _selectedAltSinavTuru &&
+              e.yayinAdi == _selectedYayinAdi &&
+              e.seri == _selectedSeri &&
+              e.sayi == _selectedSayi,
+        )
         .map((e) => e.denemeAdi)
         .toSet()
         .toList();
@@ -952,8 +2079,11 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
       default:
         break;
     }
+
     _selectedAnswers = [];
     isChecked = false;
+    _isInputLocked = false;
+    _isDuplicateLocked = false;
     correctCount = 0;
     wrongCount = 0;
     emptyCount = 0;
@@ -965,6 +2095,8 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
       _selectedDeneme = null;
       _selectedAnswers = [];
       isChecked = false;
+      _isInputLocked = false;
+      _isDuplicateLocked = false;
       correctCount = 0;
       wrongCount = 0;
       emptyCount = 0;
@@ -973,14 +2105,38 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
 
     final found = _denemeList.where((e) => e.denemeAdi == value).toList();
     _selectedDeneme = found.isNotEmpty ? found.first : null;
-    _selectedAnswers = List<String?>.filled(_selectedDeneme?.answers.length ?? 0, null);
+    _selectedAnswers = List<String?>.filled(
+      _selectedDeneme?.answers.length ?? 0,
+      null,
+    );
     isChecked = false;
+    _isInputLocked = false;
+    _isDuplicateLocked = false;
     correctCount = 0;
     wrongCount = 0;
     emptyCount = 0;
   }
 
+  Future<bool> _hasDuplicateLog({required String testId}) async {
+    final studentId = _studentId;
+    if (studentId == null || testId.isEmpty) {
+      return false;
+    }
+
+    final snapshot = await _firestore
+        .collection('student_exam_logs')
+        .where('student_id', isEqualTo: studentId)
+        .where('test_id', isEqualTo: testId)
+        .limit(1)
+        .get();
+
+    return snapshot.docs.isNotEmpty;
+  }
+
   void _toggleAnswer(int index, String option) {
+    if (_isFormLocked) {
+      return;
+    }
     setState(() {
       if (_selectedAnswers[index] == option) {
         _selectedAnswers[index] = null;
@@ -990,63 +2146,197 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
     });
   }
 
-  void _checkAnswers() {
+  Future<void> _checkAnswers() async {
     if (_selectedDeneme == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lütfen önce bir deneme seçiniz.')));
+      _showSnackBar(
+        'Lütfen önce bir deneme seçiniz.',
+        backgroundColor: Colors.orange.shade800,
+      );
       return;
     }
 
+    final hasDuplicate = await _hasDuplicateLog(
+      testId: _selectedDeneme!.denemeAdi,
+    );
+    if (hasDuplicate) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isDuplicateLocked = true);
+      _showSnackBar(
+        _duplicateErrorText,
+        backgroundColor: Colors.deepOrange.shade700,
+      );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Onay'),
+          content: const Text('Emin misin? İşlem geri alınamaz.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Evet'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    final totalQuestions = _selectedDeneme!.answers.length;
     final answeredCount = _selectedAnswers.where((e) => e != null).length;
-    final correct = List.generate(_selectedDeneme!.answers.length, (index) {
+    final correct = List.generate(totalQuestions, (index) {
       final answer = _selectedAnswers[index];
-      return answer != null && answer == _selectedDeneme!.answers[index] ? 1 : 0;
-    }).fold(0, (sum, value) => sum + value);
-    final empty = _selectedDeneme!.answers.length - answeredCount;
+      return answer != null && answer == _selectedDeneme!.answers[index]
+          ? 1
+          : 0;
+    }).fold<int>(0, (acc, item) => acc + item);
+
+    final empty = totalQuestions - answeredCount;
     final wrong = answeredCount - correct;
 
     setState(() {
       isChecked = true;
+      _isInputLocked = true;
       correctCount = correct;
       wrongCount = wrong;
       emptyCount = empty;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Yanıtlanan: $answeredCount, Doğru: $correct / ${_selectedDeneme!.answers.length}'),
-    ));
+    _showSnackBar(
+      'Kontrol tamamlandı: D:$correct, Y:$wrong, B:$empty, Toplam:$totalQuestions',
+      backgroundColor: Colors.blue.shade700,
+    );
   }
 
-  void _savePracticeOpticExamResult() {
-    if (!isChecked) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Optik deneme sonucu sisteme kaydedildi.')));
+  Future<void> _savePracticeOpticExamResult() async {
+    if (!isChecked || _selectedDeneme == null) {
+      return;
+    }
+
+    final studentId = _studentId;
+    if (studentId == null) {
+      _showSnackBar(
+        'Öğrenci oturumu bulunamadı.',
+        backgroundColor: Colors.red.shade700,
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final hasDuplicate = await _hasDuplicateLog(
+        testId: _selectedDeneme!.denemeAdi,
+      );
+      if (hasDuplicate) {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _isDuplicateLocked = true);
+        _showSnackBar(
+          _duplicateErrorText,
+          backgroundColor: Colors.deepOrange.shade700,
+        );
+        return;
+      }
+
+      await _firestore.collection('student_exam_logs').add({
+        'student_id': studentId,
+        'exam_mode': 'deneme',
+        'entry_type': 'optikli',
+        'test_id': _selectedDeneme!.denemeAdi,
+        'test_name': _selectedDeneme!.denemeAdi,
+        'alt_sinav_turu': _selectedAltSinavTuru,
+        'yayin_adi': _selectedYayinAdi,
+        'seri': _selectedSeri,
+        'sayi': _selectedSayi,
+        'correct_count': correctCount,
+        'wrong_count': wrongCount,
+        'empty_count': emptyCount,
+        'question_count': _selectedDeneme!.answers.length,
+        'selected_answers': _selectedAnswers,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isDuplicateLocked = true);
+      _showSnackBar(
+        'İşleminiz tamamlandı',
+        backgroundColor: Colors.green.shade700,
+      );
+    } catch (e) {
+      _showSnackBar(
+        'Kayıt sırasında hata oluştu: $e',
+        backgroundColor: Colors.red.shade700,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   Widget _buildResultPill(String title, String value, Color color) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: TextStyle(fontSize: 14, color: color, fontWeight: FontWeight.w700)),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
       ],
     );
   }
 
   Widget _buildDropdownField({
     required String label,
-    required String? initialValue,
+    required String? value,
     required List<String> items,
     required bool enabled,
     required ValueChanged<String?> onChanged,
   }) {
     return DropdownButtonFormField<String>(
-      initialValue: initialValue,
+      initialValue: value,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 16,
+        ),
       ),
-      items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+      items: items
+          .map(
+            (item) => DropdownMenuItem<String>(value: item, child: Text(item)),
+          )
+          .toList(),
       onChanged: enabled ? onChanged : null,
     );
   }
@@ -1066,9 +2356,9 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
         children: [
           _buildDropdownField(
             label: 'Alt Sınav Türü Seçiniz',
-            initialValue: _selectedAltSinavTuru,
+            value: _selectedAltSinavTuru,
             items: _altSinavTurleri,
-            enabled: true,
+            enabled: !_isFormLocked,
             onChanged: (value) {
               setState(() {
                 _selectedAltSinavTuru = value;
@@ -1079,9 +2369,9 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
           const SizedBox(height: 12),
           _buildDropdownField(
             label: 'Yayınevi Seçiniz',
-            initialValue: _selectedYayinAdi,
+            value: _selectedYayinAdi,
             items: _yayinAdlari,
-            enabled: _selectedAltSinavTuru != null,
+            enabled: _selectedAltSinavTuru != null && !_isFormLocked,
             onChanged: (value) {
               setState(() {
                 _selectedYayinAdi = value;
@@ -1092,9 +2382,9 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
           const SizedBox(height: 12),
           _buildDropdownField(
             label: 'Seri Seçiniz',
-            initialValue: _selectedSeri,
+            value: _selectedSeri,
             items: _seriListesi,
-            enabled: _selectedYayinAdi != null,
+            enabled: _selectedYayinAdi != null && !_isFormLocked,
             onChanged: (value) {
               setState(() {
                 _selectedSeri = value;
@@ -1105,9 +2395,9 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
           const SizedBox(height: 12),
           _buildDropdownField(
             label: 'Deneme Sayısı Seçiniz',
-            initialValue: _selectedSayi,
+            value: _selectedSayi,
             items: _sayiListesi,
-            enabled: _selectedSeri != null,
+            enabled: _selectedSeri != null && !_isFormLocked,
             onChanged: (value) {
               setState(() {
                 _selectedSayi = value;
@@ -1118,9 +2408,9 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
           const SizedBox(height: 12),
           _buildDropdownField(
             label: 'Deneme Adı Seçiniz',
-            initialValue: _selectedDenemeAdi,
+            value: _selectedDenemeAdi,
             items: _denemeAdlari,
-            enabled: _selectedSayi != null,
+            enabled: _selectedSayi != null && !_isFormLocked,
             onChanged: (value) {
               setState(() {
                 _selectDenemeAdi(value);
@@ -1138,11 +2428,21 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Seçilen Deneme', style: TextStyle(fontSize: 16, color: colorScheme.primary, fontWeight: FontWeight.w700)),
+                Text(
+                  'Seçilen Deneme',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Text(
                   _selectedDeneme?.denemeAdi ?? 'Henüz deneme seçilmedi',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -1162,13 +2462,31 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
               child: Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 16,
+                    ),
                     color: Colors.grey.shade200,
                     child: Row(
                       children: [
-                        const Expanded(flex: 2, child: Text('Soru No', style: TextStyle(fontWeight: FontWeight.bold))),
+                        const Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Soru No',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
                         ...['A', 'B', 'C', 'D', 'E'].map(
-                          (e) => Expanded(child: Center(child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold)))),
+                          (e) => Expanded(
+                            child: Center(
+                              child: Text(
+                                e,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1179,26 +2497,54 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
                     itemCount: _selectedDeneme!.answers.length,
                     itemBuilder: (context, index) {
                       return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8.0,
+                          horizontal: 12.0,
+                        ),
                         child: Row(
                           children: [
-                            Expanded(flex: 2, child: Text('${index + 1}. soru', style: const TextStyle(fontWeight: FontWeight.w500))),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                '${index + 1}. soru',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
                             ...['A', 'B', 'C', 'D', 'E'].map((option) {
-                              final isSelected = _selectedAnswers[index] == option;
+                              final isSelected =
+                                  _selectedAnswers[index] == option;
                               return Expanded(
                                 child: Center(
                                   child: GestureDetector(
-                                    onTap: () => _toggleAnswer(index, option),
+                                    onTap: _isFormLocked
+                                        ? null
+                                        : () => _toggleAnswer(index, option),
                                     child: Container(
                                       width: 40,
                                       height: 40,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        color: isSelected ? colorScheme.primary : Colors.transparent,
-                                        border: Border.all(color: isSelected ? colorScheme.primary : Colors.grey.shade400),
+                                        color: isSelected
+                                            ? colorScheme.primary
+                                            : Colors.transparent,
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? colorScheme.primary
+                                              : Colors.grey.shade400,
+                                        ),
                                       ),
                                       alignment: Alignment.center,
-                                      child: Text(option, style: TextStyle(color: isSelected ? colorScheme.onPrimary : Colors.black, fontWeight: FontWeight.bold)),
+                                      child: Text(
+                                        option,
+                                        style: TextStyle(
+                                          color: isSelected
+                                              ? colorScheme.onPrimary
+                                              : Colors.black,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1214,55 +2560,71 @@ class _PracticeOpticExamTabState extends State<PracticeOpticExamTab> {
             ),
             const SizedBox(height: 20),
             OutlinedButton(
-              onPressed: _checkAnswers,
+              onPressed: _isSaving
+                  ? null
+                  : (isChecked ? _savePracticeOpticExamResult : _checkAnswers),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                side: BorderSide(color: colorScheme.primary),
+                side: BorderSide(
+                  color: isChecked
+                      ? Colors.green.shade700
+                      : colorScheme.primary,
+                ),
+                foregroundColor: isChecked
+                    ? Colors.green.shade700
+                    : colorScheme.primary,
               ),
-              child: const Text('KONTROL ET'),
+              child: Text(
+                _isSaving
+                    ? 'Kaydediliyor...'
+                    : (isChecked ? 'SİSTEME KAYDET' : 'KONTROL ET'),
+              ),
             ),
             if (isChecked) ...[
               const SizedBox(height: 16),
               Card(
                 margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
                 elevation: 1,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Wrap(
+                    spacing: 20,
+                    runSpacing: 12,
                     children: [
-                      _buildResultPill('Doğru', correctCount.toString(), colorScheme.primary),
-                      _buildResultPill('Yanlış', wrongCount.toString(), Colors.red.shade700),
-                      _buildResultPill('Boş', emptyCount.toString(), Colors.grey.shade600),
+                      _buildResultPill(
+                        'Doğru',
+                        correctCount.toString(),
+                        colorScheme.primary,
+                      ),
+                      _buildResultPill(
+                        'Yanlış',
+                        wrongCount.toString(),
+                        Colors.red.shade700,
+                      ),
+                      _buildResultPill(
+                        'Boş',
+                        emptyCount.toString(),
+                        Colors.grey.shade600,
+                      ),
+                      _buildResultPill(
+                        'Toplam Soru',
+                        _selectedDeneme!.answers.length.toString(),
+                        Colors.blueGrey.shade700,
+                      ),
                     ],
                   ),
                 ),
               ),
-              ElevatedButton(
-                onPressed: isChecked ? _savePracticeOpticExamResult : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isChecked ? colorScheme.primary : Colors.grey,
-                  foregroundColor: colorScheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text('SİSTEME KAYDET'),
-              ),
-            ] else ...[
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text('SİSTEME KAYDET'),
-              ),
             ],
           ] else ...[
             const SizedBox(height: 24),
-            const Text('Deneme seçildikten sonra optik form burada oluşturulacaktır.', textAlign: TextAlign.center),
+            const Text(
+              'Deneme seçildikten sonra optik form burada oluşturulacaktır.',
+              textAlign: TextAlign.center,
+            ),
           ],
         ],
       ),

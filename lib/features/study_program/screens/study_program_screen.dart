@@ -924,7 +924,10 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
                 onPressed: () {
                   provider.saveProgram();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Program kilitlendi ve kaydedildi!')),
+                    const SnackBar(
+                      content: Text('Program kilitlendi ve kaydedildi!'),
+                      backgroundColor: Colors.green,
+                    ),
                   );
                 },
                 icon: const Icon(Icons.save),
@@ -998,7 +1001,12 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
                             ),
                             onPressed: () {
                               if (provider.basketSubjects.isEmpty && !provider.hasActiveProgram) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lütfen önce sepete konu ekleyin!')));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Lütfen önce sepete konu ekleyin!'),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
                                 return;
                               }
                               _showHolidaySelectionDialog(context, provider);

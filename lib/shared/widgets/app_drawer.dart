@@ -44,12 +44,36 @@ class AppDrawer extends StatelessWidget {
           ),
 
           // --- Test ve Sınav Merkezi ---
-          ListTile(
+          ExpansionTile(
             leading: const Icon(Icons.edit_document, color: Colors.blueAccent),
             title: const Text('Test ve Sınav Merkezi', style: TextStyle(fontSize: 16)),
+            children: [
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 56.0),
+                title: const Text('Test Girişleri', style: TextStyle(fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.go('/exams?mode=test');
+                },
+              ),
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 56.0),
+                title: const Text('Deneme Girişleri', style: TextStyle(fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.go('/exams?mode=deneme');
+                },
+              ),
+            ],
+          ),
+
+          // --- Durum Analizi ---
+          ListTile(
+            leading: const Icon(Icons.bar_chart, color: Colors.blueAccent),
+            title: const Text('Durum Analizi', style: TextStyle(fontSize: 16)),
             onTap: () {
               Navigator.pop(context);
-              context.go('/exams');
+              context.go('/analysis');
             },
           ),
 
@@ -61,24 +85,6 @@ class AppDrawer extends StatelessWidget {
               Navigator.pop(context);
               context.go('/academic-study-room');
             },
-          ),
-
-          // --- Detaylı Analiz ve Röntgen ---
-          ExpansionTile(
-            leading: const Icon(Icons.analytics, color: Colors.blueAccent),
-            title: const Text('Detaylı Analiz ve Röntgen', style: TextStyle(fontSize: 16)),
-            children: [
-              ListTile(
-                contentPadding: const EdgeInsets.only(left: 56.0),
-                title: const Text('Zaman Bazlı Özetler', style: TextStyle(fontSize: 14)),
-                onTap: () {},
-              ),
-              ListTile(
-                contentPadding: const EdgeInsets.only(left: 56.0),
-                title: const Text('Sınav Röntgenleri', style: TextStyle(fontSize: 14)),
-                onTap: () {},
-              ),
-            ],
           ),
 
           // --- Rehberlik ve Yönlendirme ---

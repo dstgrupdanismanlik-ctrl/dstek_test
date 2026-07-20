@@ -165,6 +165,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('$payloadKey tablosu yukleniyor...'),
+        backgroundColor: Colors.blue,
         duration: const Duration(seconds: 2),
       ),
     );

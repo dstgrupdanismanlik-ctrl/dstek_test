@@ -59,7 +59,11 @@ final GoRouter appRouter = GoRouter(
         ),
         GoRoute(
           path: '/exams',
-          builder: (context, state) => const ExamEntryScreen(),
+          builder: (context, state) {
+            final mode = state.uri.queryParameters['mode'];
+            final examMode = mode == 'deneme' ? ExamMode.deneme : ExamMode.test;
+            return ExamEntryScreen(mode: examMode);
+          },
         ),
         GoRoute(
           path: '/profile',

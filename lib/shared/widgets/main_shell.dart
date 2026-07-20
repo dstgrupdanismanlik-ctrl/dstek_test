@@ -47,7 +47,7 @@ class _MainShellState extends State<MainShell> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Ana Sayfa'),
           BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Programım'),
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Analiz'),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Durum Analizi'),
           BottomNavigationBarItem(icon: Icon(Icons.edit_document), label: 'Sınavlar'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
         ],

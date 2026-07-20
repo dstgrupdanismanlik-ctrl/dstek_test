@@ -278,7 +278,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profil başarıyla kaydedildi!')));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Profil başarıyla kaydedildi!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
                     }
                   },
                   child: const Text('Bilgileri Kaydet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
