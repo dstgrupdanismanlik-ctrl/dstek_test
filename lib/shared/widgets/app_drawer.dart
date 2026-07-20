@@ -8,22 +8,33 @@ class AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final role = (authProvider.currentUserData?['role'] ?? '').toString().toLowerCase();
+    final isim = authProvider.currentUserData?['name'];
+    final canSeeAdminSections = role == 'admin';
+    final canSeeUserManagement =
+        role == 'admin' || role == 'yönetici' || role == 'koc' || role == 'koç';
+    final canSeeTopicManagement = canSeeUserManagement;
+    final headerTitle = (isim != null && isim.toString().isNotEmpty)
+        ? 'Hoş Geldin,\n$isim'
+        : 'Öğrenci Paneli';
+
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
           // --- Drawer Başlığı ---
-          const DrawerHeader(
-            decoration: BoxDecoration(color: Colors.blueAccent),
+          DrawerHeader(
+            decoration: const BoxDecoration(color: Colors.blueAccent),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Icon(Icons.school, size: 48, color: Colors.white),
-                SizedBox(height: 8),
+                const Icon(Icons.school, size: 48, color: Colors.white),
+                const SizedBox(height: 8),
                 Text(
-                  'Öğrenci Paneli',
-                  style: TextStyle(
+                  headerTitle,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -117,16 +128,38 @@ class AppDrawer extends StatelessWidget {
               ListTile(
                 contentPadding: const EdgeInsets.only(left: 56.0),
                 title: const Text('Şifre Değiştirme', style: TextStyle(fontSize: 14)),
-                onTap: () {}, // TODO: Şifre değiştirme rotası eklenecek
-              ),
-              ListTile(
-                contentPadding: const EdgeInsets.only(left: 56.0),
-                title: const Text('Sistem Kurulumu (Admin)', style: TextStyle(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.bold)),
                 onTap: () {
-                  Navigator.pop(context); // Menüyü kapat
-                  context.go('/admin-settings'); // Admin sayfasına git
+                  Navigator.pop(context);
+                  context.go('/settings');
                 },
               ),
+              if (canSeeUserManagement)
+                ListTile(
+                  contentPadding: const EdgeInsets.only(left: 56.0),
+                  title: const Text('Kullanıcı İşlemleri', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/user-management');
+                  },
+                ),
+              if (canSeeTopicManagement)
+                ListTile(
+                  contentPadding: const EdgeInsets.only(left: 56.0),
+                  title: const Text('Müfredat İşlemleri', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/topic-management');
+                  },
+                ),
+              if (canSeeAdminSections)
+                ListTile(
+                  contentPadding: const EdgeInsets.only(left: 56.0),
+                  title: const Text('Sistem Kurulumu (Admin)', style: TextStyle(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                  onTap: () {
+                    Navigator.pop(context); // Menüyü kapat
+                    context.go('/admin-settings'); // Admin sayfasına git
+                  },
+                ),
             ],
           ),
 
@@ -136,7 +169,8 @@ class AppDrawer extends StatelessWidget {
             title: const Text('Çıkış Yap', style: TextStyle(fontSize: 16, color: Colors.redAccent)),
             onTap: () async {
               Navigator.pop(context);
-              await context.read<AuthProvider>().signOut();
+              await authProvider.signOut();
+              if (context.mounted) context.go('/login');
             },
           ),
 

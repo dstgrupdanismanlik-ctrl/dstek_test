@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:dstek/shared/widgets/expandable_card.dart';
 import 'package:dstek/shared/widgets/app_drawer.dart';
 import 'package:dstek/core/services/setup_service.dart';
+import 'package:dstek/features/auth/providers/auth_provider.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isim = context.watch<AuthProvider>().currentUserData?['name'];
+    final welcomeTitle = (isim != null && isim.toString().isNotEmpty)
+        ? 'Hoş Geldin, ${isim.toString()}'
+        : 'Hoş Geldin';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('DSTEK'),
@@ -32,16 +39,19 @@ class HomeScreen extends StatelessWidget {
       drawer: const AppDrawer(),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
-        children: const [
-          Text('Hoş Geldin!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          SizedBox(height: 16),
-          ExpandableCard(
+        children: [
+          Text(
+            welcomeTitle,
+            style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          const ExpandableCard(
             title: 'Günün Motivasyonu', 
             icon: Icons.star, 
             content: 'Başarı, küçük çabaların her gün tekrarlanmasıdır.'
           ),
-          SizedBox(height: 16),
-          ExpandableCard(
+          const SizedBox(height: 16),
+          const ExpandableCard(
             title: 'Koçluk Notları', 
             icon: Icons.note_alt, 
             content: 'Matematik branşında oran orantı konusuna ağırlık verilmeli.'

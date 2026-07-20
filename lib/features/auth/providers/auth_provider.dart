@@ -10,11 +10,30 @@ class AuthProvider with ChangeNotifier {
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
+  Map<String, dynamic>? _currentUserData;
+  Map<String, dynamic>? get currentUserData => _currentUserData;
 
   User? get currentUser => _auth.currentUser;
 
   void _setLoading(bool value) {
     _isLoading = value;
+    notifyListeners();
+  }
+
+  Future<void> fetchUserData() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      _currentUserData = null;
+      notifyListeners();
+      return;
+    }
+
+    final doc = await _firestore.collection('users').doc(uid).get();
+    if (doc.exists) {
+      _currentUserData = doc.data();
+    } else {
+      _currentUserData = null;
+    }
     notifyListeners();
   }
 
@@ -72,6 +91,7 @@ class AuthProvider with ChangeNotifier {
     try {
       _setLoading(true);
       await _auth.signInWithEmailAndPassword(email: email, password: password);
+      await fetchUserData();
     } catch (e) {
       rethrow;
     } finally {
@@ -80,6 +100,7 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    _currentUserData = null;
     await _auth.signOut();
     notifyListeners();
   }
