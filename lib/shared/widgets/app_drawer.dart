@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/feedback/screens/feedback_management_screen.dart';
+import '../../features/feedback/widgets/feedback_dialog.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -9,12 +11,15 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
-    final role = (authProvider.currentUserData?['role'] ?? '').toString().toLowerCase();
+    final role = (authProvider.currentUserData?['role'] ?? '').toString().toLowerCase().trim();
     final isim = authProvider.currentUserData?['name'];
+    
+    // Yetki Kontrolleri
     final canSeeAdminSections = role == 'admin';
-    final canSeeUserManagement =
-        role == 'admin' || role == 'yönetici' || role == 'koc' || role == 'koç';
+    final canSeeFeedbackManagement = role == 'admin' || role == 'yönetici';
+    final canSeeUserManagement = role == 'admin' || role == 'yönetici' || role == 'koc' || role == 'koç';
     final canSeeTopicManagement = canSeeUserManagement;
+    
     final headerTitle = (isim != null && isim.toString().isNotEmpty)
         ? 'Hoş Geldin,\n$isim'
         : 'Öğrenci Paneli';
@@ -120,7 +125,7 @@ class AppDrawer extends StatelessWidget {
 
           const Divider(),
 
-          // --- Ayarlar ---
+          // --- Ayarlar (Sadece Alt Sekmeler Burada) ---
           ExpansionTile(
             leading: const Icon(Icons.settings, color: Colors.blueAccent),
             title: const Text('Ayarlar', style: TextStyle(fontSize: 16)),
@@ -156,14 +161,46 @@ class AppDrawer extends StatelessWidget {
                   contentPadding: const EdgeInsets.only(left: 56.0),
                   title: const Text('Sistem Kurulumu (Admin)', style: TextStyle(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.bold)),
                   onTap: () {
-                    Navigator.pop(context); // Menüyü kapat
-                    context.go('/admin-settings'); // Admin sayfasına git
+                    Navigator.pop(context);
+                    context.go('/admin-settings');
+                  },
+                ),
+              if (canSeeFeedbackManagement)
+                ListTile(
+                  contentPadding: const EdgeInsets.only(left: 56.0),
+                  leading: const Icon(Icons.feedback_outlined, size: 18),
+                  title: const Text('Gelen Bildirimler', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const FeedbackManagementScreen(),
+                      ),
+                    );
                   },
                 ),
             ],
           ),
 
-          // --- Çıkış Yap ---
+          // --- Hata / Öneri Bildir (ExpansionTile DIŞINDA!) ---
+          ListTile(
+            leading: const Icon(Icons.bug_report, color: Colors.deepOrange),
+            title: const Text('Hata / Öneri Bildir', style: TextStyle(fontSize: 16)),
+            onTap: () {
+              // Menüyü anında kapatıp pop-up'ı hafif bir gecikmeyle açıyoruz
+              Navigator.of(context).pop();
+              Future.delayed(const Duration(milliseconds: 150), () {
+                if (context.mounted) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => const FeedbackDialog(),
+                  );
+                }
+              });
+            },
+          ),
+
+          // --- Çıkış Yap (ExpansionTile DIŞINDA!) ---
           ListTile(
             leading: const Icon(Icons.exit_to_app, color: Colors.redAccent),
             title: const Text('Çıkış Yap', style: TextStyle(fontSize: 16, color: Colors.redAccent)),

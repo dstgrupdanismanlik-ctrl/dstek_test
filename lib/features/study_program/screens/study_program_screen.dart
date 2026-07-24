@@ -34,6 +34,10 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
   final ScrollController _weeklyScrollController = ScrollController();
   final Map<String, ScrollController> _columnScrollControllers = {};
   
+  // YENİ: Uçan pencereleri devreden çıkardık, standart TextField kontrolcüsü ve metin tutucu ekledik.
+  final TextEditingController _inlineSearchController = TextEditingController();
+  String _searchQuery = '';
+  
   DateTime currentWeekStart = DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1));
   bool isWeeklyView = true;
   int selectedDayIndex = DateTime.now().weekday - 1;
@@ -63,6 +67,7 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
     _tabController.dispose();
     _kanbanScrollController.dispose();
     _weeklyScrollController.dispose();
+    _inlineSearchController.dispose(); // Yeni arama motorunun hafızasını temizle
     for (final controller in _columnScrollControllers.values) {
       controller.dispose();
     }
@@ -169,6 +174,176 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
     return hours.toStringAsFixed(1);
   }
 
+  String _resolveTaskTagLabel(String columnId) {
+    switch (columnId) {
+      case 'column-1':
+        return 'Konu Çalış';
+      case 'column-2':
+      case 'column-3':
+        return 'Tekrar Et / Destek';
+      case 'column-4':
+      case 'column-5':
+        return 'Soru Çöz';
+      default:
+        return 'Görev';
+    }
+  }
+
+  Color _resolveTaskTagBackgroundColor(String columnId) {
+    switch (columnId) {
+      case 'column-1':
+        return Colors.blue.shade50;
+      case 'column-2':
+      case 'column-3':
+        return Colors.orange.shade50;
+      case 'column-4':
+      case 'column-5':
+        return Colors.green.shade50;
+      default:
+        return Colors.grey.shade100;
+    }
+  }
+
+  Color _resolveTaskTagBorderColor(String columnId) {
+    switch (columnId) {
+      case 'column-1':
+        return Colors.blue.shade200;
+      case 'column-2':
+      case 'column-3':
+        return Colors.orange.shade200;
+      case 'column-4':
+      case 'column-5':
+        return Colors.green.shade200;
+      default:
+        return Colors.grey.shade300;
+    }
+  }
+
+  Color _resolveTaskTagTextColor(String columnId) {
+    switch (columnId) {
+      case 'column-1':
+        return Colors.blue.shade800;
+      case 'column-2':
+      case 'column-3':
+        return Colors.orange.shade900;
+      case 'column-4':
+      case 'column-5':
+        return Colors.green.shade800;
+      default:
+        return Colors.grey.shade800;
+    }
+  }
+
+  List<StudySubject> _kanbanTopics(StudyProgramProvider provider) {
+    return provider.subjects
+        .where((subject) => provider.columnOrder.contains(subject.columnId))
+        .toList();
+  }
+
+  Widget _buildTaskTagChip(String columnId) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: _resolveTaskTagBackgroundColor(columnId),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: _resolveTaskTagBorderColor(columnId)),
+      ),
+      child: Text(
+        _resolveTaskTagLabel(columnId),
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w600,
+          color: _resolveTaskTagTextColor(columnId),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSmartTopicSearch(BuildContext context, StudyProgramProvider provider) {
+    final kanbanTopics = _kanbanTopics(provider);
+    final matches = _searchQuery.isEmpty 
+        ? <StudySubject>[] 
+        : kanbanTopics.where((s) => s.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _inlineSearchController,
+            decoration: InputDecoration(
+              hintText: 'Müfredatta Konu Ara (Örn: Logaritma)...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _inlineSearchController.clear();
+                        setState(() {
+                          _searchQuery = '';
+                        });
+                        FocusScope.of(context).unfocus();
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+              });
+            },
+          ),
+          if (matches.isNotEmpty)
+            Container(
+              constraints: const BoxConstraints(maxHeight: 250),
+              margin: const EdgeInsets.only(top: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blueGrey.shade100),
+                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
+              ),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: matches.length,
+                padding: EdgeInsets.zero,
+                itemBuilder: (context, index) {
+                  final subject = matches[index];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    elevation: 1,
+                    child: ListTile(
+                      title: Text(subject.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      trailing: ElevatedButton.icon(
+                        icon: const Icon(Icons.add_shopping_cart, size: 16),
+                        label: const Text('Sepete At'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () {
+                          _inlineSearchController.clear();
+                          setState(() {
+                            _searchQuery = '';
+                          });
+                          FocusScope.of(context).unfocus();
+                          _handleAddToBasket(subject, subject.columnId);
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   _PrerequisiteLockMode _resolvePrerequisiteLockMode(StudySubject subject) {
     final score = subject.safeScore;
     if (score <= 0) {
@@ -185,8 +360,14 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
 
   Future<void> _handleAddToBasket(
     StudySubject subject,
-    StudyProgramProvider provider,
+    String sourceColumnId,
   ) async {
+    final provider = context.read<StudyProgramProvider>();
+    
+    // 🚨 HATA BURADAYDI! copyWith yeni bir referans (klon) üretiyordu.
+    // Provider arka planda bu klon konuyu listelerinde bulamadığı için
+    // hiçbir hata fırlatmadan (sessizce) işlemi iptal ediyordu!
+    // ÇÖZÜM: Doğrudan orijinal referansı (subject) kullanıyoruz.
     final item = subject;
 
     if (item.columnId == 'column-2' && item.placementCount >= 3) {
@@ -324,8 +505,8 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
                   children: [
                     Text(
                       allowSkip
-                        ? '${subject.name} konusuna geçmeden önce aşağıdaki ön koşulları sepete eklemen önerilir.'
-                        : 'Bu ${subject.name} konusunu sepete atmadan önce en az 1 ön koşul seçmelisin.',
+                          ? '${subject.name} konusuna geçmeden önce aşağıdaki ön koşulları sepete eklemen önerilir.'
+                          : 'Bu ${subject.name} konusunu sepete atmadan önce en az 1 ön koşul seçmelisin.',
                     ),
                     const SizedBox(height: 12),
                     Flexible(
@@ -491,13 +672,22 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                             title: Text(item.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            subtitle: Text(
-                              'Saf skor: ${item.safeScore.toStringAsFixed(0)} • Süre: ${effectiveHours % 1 == 0 ? effectiveHours.toStringAsFixed(0) : effectiveHours.toStringAsFixed(1)} saat',
-                              style: const TextStyle(fontSize: 11),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Saf skor: ${item.safeScore.toStringAsFixed(0)} • Süre: ${effectiveHours % 1 == 0 ? effectiveHours.toStringAsFixed(0) : effectiveHours.toStringAsFixed(1)} saat',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  child: _buildTaskTagChip(columnId),
+                                ),
+                              ],
                             ),
                             trailing: IconButton(
                               icon: const Icon(Icons.add_circle, color: Colors.blueAccent, size: 20),
-                              onPressed: () => _handleAddToBasket(item, provider),
+                              onPressed: () => _handleAddToBasket(item, item.columnId),
                             ),
                           ),
                         ),
@@ -579,7 +769,7 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
           flex: 5,
           child: DragTarget<StudySubject>(
             onAcceptWithDetails: (details) {
-              _handleAddToBasket(details.data, provider);
+              _handleAddToBasket(details.data, details.data.columnId);
             },
             builder: (context, candidateData, rejectedData) {
               return Container(
@@ -674,7 +864,15 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
               style: TextStyle(fontSize: isCompact ? 11 : 14, fontWeight: FontWeight.bold, decoration: isCompletedForDay ? TextDecoration.lineThrough : null),
               maxLines: isCompact ? 2 : null, overflow: isCompact ? TextOverflow.ellipsis : null,
             ),
-            subtitle: isCompact ? null : Text('Durum: ${task.effectiveScore.toStringAsFixed(0)} puan'),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!isCompact)
+                  Text('Durum: ${task.effectiveScore.toStringAsFixed(0)} puan'),
+                SizedBox(height: isCompact ? 2 : 4),
+                _buildTaskTagChip(task.columnId),
+              ],
+            ),
             trailing: isSaved ? null : IconButton(
               icon: Icon(Icons.delete, color: Colors.red, size: isCompact ? 16 : 24),
               onPressed: () => provider.removeFromProgram(task),
@@ -960,7 +1158,8 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
           body: Column(
             children: [
               _buildTopBanner(provider),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+              _buildSmartTopicSearch(context, provider),
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

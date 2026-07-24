@@ -161,7 +161,7 @@ class _AcademicStudyRoomScreenState extends State<AcademicStudyRoomScreen> {
                                 border: OutlineInputBorder(),
                                 prefixIcon: Icon(Icons.menu_book),
                               ),
-                              value: selectedDers,
+                              initialValue: selectedDers,
                               items: dersList
                                   .map((value) => DropdownMenuItem(value: value, child: Text(value)))
                                   .toList(),
@@ -176,7 +176,7 @@ class _AcademicStudyRoomScreenState extends State<AcademicStudyRoomScreen> {
                                 filled: selectedDers == null,
                                 fillColor: Colors.grey.shade100,
                               ),
-                              value: selectedKonu,
+                              initialValue: selectedKonu,
                               items: konuList
                                   .map((value) => DropdownMenuItem(value: value, child: Text(value)))
                                   .toList(),
@@ -218,7 +218,7 @@ class _AcademicStudyRoomScreenState extends State<AcademicStudyRoomScreen> {
     final query = Uri.encodeComponent('${topic.altSinavTuru} ${topic.ders} ${topic.konu}');
     final tools = [
       _StudyTool(title: 'Google PDF', icon: Icons.picture_as_pdf, url: 'https://www.google.com/search?q=$query+filetype:pdf'),
-      _StudyTool(title: 'Google Video', icon: Icons.ondemand_video, url: 'https://www.youtube.com/results?search_query=$query'),
+      _StudyTool(title: 'Google Video', icon: Icons.ondemand_video, url: 'https://www.google.com/search?q=$query&tbm=vid'),
       _StudyTool(title: 'MEBİ / EBA PDF', icon: Icons.menu_book, url: 'https://www.google.com/search?q=$query+site:gov.tr+filetype:pdf'),
       _StudyTool(title: 'MEBİ / EBA Video', icon: Icons.video_library, url: 'https://www.google.com/search?q=$query+%22Ortaöğretim+Genel+Müdürlüğü%22+OR+%22TRT+EBA%22&tbm=vid'),
       _StudyTool(title: 'Kurumsal PDF', icon: Icons.description, url: topic.kurumsalPdfLink),

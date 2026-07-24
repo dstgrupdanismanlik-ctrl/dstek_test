@@ -153,21 +153,20 @@ class _TopicManagementScreenState extends State<TopicManagementScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 780),
-          child: ListView(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            children: [
-              Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
+            child: Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                         const Text(
                           'Sisteme Yeni Konu / Müfredat Ekle',
                           style: TextStyle(
@@ -253,7 +252,7 @@ class _TopicManagementScreenState extends State<TopicManagementScreen> {
                           keyboardType: TextInputType.number,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           decoration: const InputDecoration(
-                            labelText: 'Ana Çalışma Süresi (dk)',
+                            labelText: 'Ana Çalışma Süresi (Saat)',
                             prefixIcon: Icon(Icons.timelapse_outlined),
                             border: OutlineInputBorder(),
                           ),
@@ -316,18 +315,17 @@ class _TopicManagementScreenState extends State<TopicManagementScreen> {
                             icon: const Icon(Icons.save_outlined),
                             label: _isSaving
                                 ? const Text('Kaydediliyor...')
-                                : const Text('Kriteri Kaydet'),
+                                : const Text('Müfredatı Kaydet'),
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
