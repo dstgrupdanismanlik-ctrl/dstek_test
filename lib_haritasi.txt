@@ -1,80 +1,230 @@
-﻿Folder PATH listing for volume Windows
-Volume serial number is 00000238 BEE9:1196
-C:\PROJELER\DSTEK_TEST\LIB
-|   firebase_options.dart
-|   main.dart
-|   
-+---core
-|   +---init
-|   |       app_initializer.dart
-|   |       
-|   +---routing
-|   |       app_router.dart
-|   |       
-|   +---services
-|   |       setup_service.dart
-|   |       
-|   \---utils
-+---features
-|   +---academic_room
-|   |   \---screens
-|   |           academic_study_room_screen.dart
-|   |           
-|   +---admin
-|   |   \---screens
-|   |           admin_settings_screen.dart
-|   |           
-|   +---auth
-|   |   +---models
-|   |   |       user_model.dart
-|   |   |       
-|   |   +---providers
-|   |   |       auth_provider.dart
-|   |   |       
-|   |   \---screens
-|   |           login_screen.dart
-|   |           register_screen.dart
-|   |           
-|   +---exams
-|   |   \---screens
-|   |           exam_entry_screen.dart
-|   |           
-|   +---guidance_counseling
-|   |   \---screens
-|   |           guidance_counseling_screen.dart
-|   |           
-|   +---home
-|   |   \---screens
-|   |           home_screen.dart
-|   |           
-|   +---inventory_system
-|   |   |   inventory_system_screen.dart
-|   |   |   
-|   |   \---screens
-|   +---profile
-|   |   +---models
-|   |   |       student_profile_model.dart
-|   |   |       
-|   |   \---screens
-|   |           profile_screen.dart
-|   |           
-|   \---study_program
-|       +---models
-|       |       study_subject.dart
-|       |       
-|       +---providers
-|       |       study_program_provider.dart
-|       |       
-|       +---screens
-|       |       study_program_screen.dart
-|       |       
-|       \---services
-|               study_program_service.dart
-|               
-\---shared
-    \---widgets
-            app_drawer.dart
-            expandable_card.dart
-            main_shell.dart
-            
+﻿DSTEK TEST - AYRINTILI PROJE HARİTASI
+Güncel durum: 2026-07-25
 
+Bu harita, yalnızca dosya adlarını değil; her dosyanın ne işe yaradığını, hangi bölümleri içerdiğini, hangi özellikleri sağladığını ve bir değişiklik yapılacaksa hangi dosyaya müdahale edilmesi gerektiğini anlatır.
+
+1. PROJENİN GENEL YAPISI
+
+1.1. Uygulama iskeleti
+- lib/main.dart
+  - Uygulamanın ana giriş noktasıdır.
+  - MaterialApp, Firebase başlatma, router ve ana uygulama kurulumu burada yapılır.
+  - Değişiklik örneği: tema değişimi, yeni başlatma akışı, global provider ekleme.
+
+- lib/firebase_options.dart
+  - Firebase proje yapılandırmasını tutar.
+  - Yeni platform eklenecekse veya Firebase bilgileri değişecekse burası güncellenir.
+
+1.2. Başlangıç ve yönlendirme katmanı
+- lib/core/init/app_initializer.dart
+  - Uygulama açılışında splash benzeri ilk ekranı yönetir.
+  - FirebaseAuth mevcut kullanıcı durumunu kontrol eder.
+  - Kullanıcı oturumlu ise /home, değilse /login sayfasına yönlendirir.
+  - Değişiklik örneği: ilk ekran tasarımı, farklı yönlendirme koşulları.
+
+- lib/core/routing/app_router.dart
+  - Tüm ekranların rotalarını tanımlar.
+  - /, /login, /register ve ana shell rotaları burada saklanır.
+  - Yeni ekran eklendiğinde route buraya eklenir.
+  - Değişiklik örneği: yeni ekran eklemek, ekran adı değiştirmek, menüye yeni bağlantı eklemek.
+
+1.3. Sistem başlangıç verileri
+- lib/core/services/setup_service.dart
+  - Firestore'a başlangıç verilerini yükler.
+  - profile_options ve exam_matrix gibi sistem sabitlerini hazırlar.
+  - Değişiklik örneği: yeni profil alanı, yeni sınav türü, yeni sabit veri ekleme.
+
+2. ORTAK VE YENİDEN KULLANILAN BİLEŞENLER
+
+- lib/shared/widgets/app_drawer.dart
+  - Ana gezinti menüsünü sağlar.
+  - Hangi ekranlara erişilebileceğini belirler.
+  - Değişiklik örneği: yeni ekran eklendiğinde burada link eklenir.
+
+- lib/shared/widgets/main_shell.dart
+  - Uygulama genel kabuğunu oluşturur.
+  - Üst başlık, içerik alanı ve ortak layout yapısını yönetir.
+  - Değişiklik örneği: genel düzen, toolbar, ortak padding gibi değişiklikler.
+
+- lib/shared/widgets/expandable_card.dart
+  - Genişletilebilir kart bileşeni olarak kullanılır.
+  - Birçok ekranda tekrar eden içerik düzeni için uygundur.
+
+3. ANA ÖZELLİK MODÜLLERİ
+
+3.1. Kimlik doğrulama ve kullanıcı yönetimi
+- lib/features/auth/models/user_model.dart
+  - Kullanıcı verisini temsil eden model sınıfıdır.
+  - Kullanıcı adı, rol, kurum kodu, e-posta, telefon, aktiflik gibi alanları içerir.
+  - Değişiklik örneği: yeni kullanıcı alanı eklemek.
+
+- lib/features/auth/providers/auth_provider.dart
+  - Giriş, kayıt ve oturum akışını yönetir.
+  - FirebaseAuth ve Firestore işlemlerini koordine eder.
+  - Değişiklik örneği: yeni giriş yöntemi, rol bazlı kontrol, yeni kullanıcı verisi kaydı.
+
+- lib/features/auth/screens/login_screen.dart
+  - Giriş ekranı bileşenidir.
+  - Form alanları, doğrulama, KVKK onayı ve yönlendirme mantığını içerir.
+  - Değişiklik örneği: yeni giriş alanı, hata mesajı değişimi, tasarım güncellemesi.
+
+- lib/features/auth/screens/register_screen.dart
+  - Kayıt ekranıdır.
+  - Yeni kullanıcı oluşturma akışını sunar.
+  - Değişiklik örneği: yeni kayıt alanı, doğrulama kuralı, rol seçimi değişikliği.
+
+3.2. Ana ekran ve genel kullanım
+- lib/features/home/screens/home_screen.dart
+  - Ana ekranı temsil eder.
+  - Uygulamanın genel giriş noktasıdır.
+  - Değişiklik örneği: özet kartlar, hızlı erişim butonları, kullanıcı bilgisi alanı ekleme.
+
+3.3. Akademik plan / çalışma programı
+- lib/features/study_program/models/study_subject.dart
+  - Çalışma programı içindeki konu ve alan verisini temsil eder.
+  - Değişiklik örneği: yeni konu alanı, yeni veri tipi eklemek.
+
+- lib/features/study_program/providers/study_program_provider.dart
+  - Çalışma programı verilerinin state yönetimini sağlar.
+  - Değişiklik örneği: filtreleme mantığı, veri yenileme akışı, yükleme durumu.
+
+- lib/features/study_program/services/study_program_service.dart
+  - Verileri sağlayan servis katmanıdır.
+  - Firestore veya diğer veri kaynaklarına erişim burada yapılır.
+  - Değişiklik örneği: veri kaynağı değişimi, yeni koleksiyon entegrasyonu.
+
+- lib/features/study_program/screens/study_program_screen.dart
+  - Çalışma programı ana ekranıdır.
+  - Değişiklik örneği: ekran düzeni, konu listesi, görünüm mantığı.
+
+- lib/features/study_program/screens/analysis_screen.dart
+  - Çalışma programı analiz / rapor ekranıdır.
+  - Değişiklik örneği: grafik ekleme, farklı veri görselleştirmesi.
+
+3.4. Akademik çalışma odası
+- lib/features/academic_room/screens/academic_study_room_screen.dart
+  - Ders ve konu bazlı içerik seçimini sağlar.
+  - Firestore'dan veri çeker; konuya ait çalışma araçlarını listeler.
+  - Değişiklik örneği: yeni ders kategorisi, yeni çalışma aracı, farklı filtreleme.
+
+3.5. Sınav sistemi
+- lib/features/exams/screens/exam_entry_screen.dart
+  - Sınav giriş ve tercih akışını temsil eder.
+  - Değişiklik örneği: sınav türü eklemek, yeni alanlar eklemek.
+
+3.6. Profil ve ayarlar
+- lib/features/profile/models/student_profile_model.dart
+  - Öğrenci profil bilgilerini modelleyen dosyadır.
+  - Değişiklik örneği: yeni profil alanı eklemek.
+
+- lib/features/profile/screens/profile_screen.dart
+  - Profil bilgilerini görüntüler.
+  - Değişiklik örneği: profil düzenleme, yeni bilgi kartı eklemek.
+
+- lib/features/profile/screens/settings_screen.dart
+  - Profil ayarlarını ve kullanıcı tercihlerini barındırır.
+  - Değişiklik örneği: yeni ayar başlığı, seçenek ekleme.
+
+3.7. Rehberlik ve danışmanlık
+- lib/features/guidance_counseling/screens/guidance_counseling_screen.dart
+  - Öğrenci destek akışını sunar.
+  - Değişiklik örneği: yeni danışmanlık adımı, yeni içerik kategorisi.
+
+3.8. Envanter sistemi
+- lib/features/inventory_system/inventory_system_screen.dart
+  - Envanter/ürün takibi ekranıdır.
+  - Değişiklik örneği: yeni durum alanı, filtreleme, kategori ekleme.
+
+3.9. Yönetici alanı
+- lib/features/admin/screens/admin_settings_screen.dart
+  - Yönetici ayarları ve veritabanı senkronizasyon işlemlerini yönetir.
+  - Değişiklik örneği: yeni senkron tabloyu eklemek, farklı API/Firestore akışı kurmak.
+
+- lib/features/admin/screens/topic_management_screen.dart
+  - Konu yönetimi ekranıdır.
+  - Değişiklik örneği: konu ekleme/çıkarma akışı, doğrulama kuralları.
+
+- lib/features/admin/screens/user_management_screen.dart
+  - Kullanıcı yönetimi ekranıdır.
+  - Değişiklik örneği: rol düzenleme, kullanıcı filtreleme, liste görünümü.
+
+3.10. Geri bildirim sistemi
+- lib/features/feedback/screens/feedback_management_screen.dart
+  - Geri bildirimlerin görüntülenmesi ve yönetimi için ekran.
+  - Değişiklik örneği: yeni durum alanı, filtreleme, liste görünümü.
+
+- lib/features/feedback/widgets/feedback_dialog.dart
+  - Yeni geri bildirim ekleme dialog'udur.
+  - Değişiklik örneği: yeni alan eklemek, doğrulama eklemek, modal tasarım değiştirmek.
+
+3.11. Bu rehber dosyasının amacı ve kullanımı
+- Bu dosya, ana asistanın "bu özellik için hangi dosyaya bakmalı?" sorusuna cevap vermek için hazırlanmıştır.
+- Bu dosya, kodun kendisini değil; kodun sorumluluğunu, mantığını ve değişiklik etkisini anlatır.
+- Eğer bir dosyanın gerçek kaynak kodu gerektiğinde, ilgili dosya başlığı için tum_kodlar.txt dosyasına bakılır.
+- Bu dosya, özellikle şu durumlarda kullanılır:
+  - yeni özellik eklemek
+  - mevcut bir ekranı değiştirmek
+  - bir hata için sorumluluk alanını bulmak
+  - bir dosyanın rolünü hızlıca anlamak
+
+3.12. Asistan için kısa karar kuralı
+- Ekran görünümü değişiyorsa: ilgili feature ekranı + router + drawer
+- Veri modeli değişiyorsa: model + provider/service + ekran
+- Oturum sistemi değişiyorsa: auth provider + login/register + initializer + router
+- Ortak UI değişiyorsa: shared/widgets altındaki dosyalar
+- Firestore / Google Sheets verisi değişiyorsa: service/provider + ekran + admin sync dosyası
+
+4. HANGİ DEĞİŞİKLİKTE HANGİ DOSYAYA BAKILMALI?
+
+4.1. Yeni ekran eklenirse
+- Öncelikli dosyalar:
+  - lib/core/routing/app_router.dart
+  - lib/shared/widgets/app_drawer.dart
+  - lib/shared/widgets/main_shell.dart
+  - ilgili feature ekran dosyası
+
+4.2. Oturum/kimlik doğrulama değişirse
+- Öncelikli dosyalar:
+  - lib/features/auth/providers/auth_provider.dart
+  - lib/features/auth/screens/login_screen.dart
+  - lib/features/auth/screens/register_screen.dart
+  - lib/core/init/app_initializer.dart
+  - lib/core/routing/app_router.dart
+
+4.3. Veri modeli değişirse
+- Öncelikli dosyalar:
+  - ilgili model dosyası
+  - ilgili provider/service dosyası
+  - ilgili ekran dosyası
+  - gerekirse lib/core/services/setup_service.dart
+
+4.4. Menü veya genel layout değişirse
+- Öncelikli dosyalar:
+  - lib/shared/widgets/app_drawer.dart
+  - lib/shared/widgets/main_shell.dart
+  - lib/features/home/screens/home_screen.dart
+
+4.5. Firestore/Google Sheets verisi değişirse
+- Öncelikli dosyalar:
+  - ilgili service/provider dosyası
+  - ilgili ekran dosyası
+  - lib/core/services/setup_service.dart
+  - lib/features/admin/screens/admin_settings_screen.dart
+
+5. KISA YÖNERGE: ASİSTANIN HANGİ DOSYAYI KONTROL ETMESİ GEREKİR?
+
+- Kullanıcı giriş/çıkış ve oturum akışı: auth provider + login/register + initializer + router
+- Yeni sayfa ekleme: router + drawer + shell + ilgili feature ekranı
+- Profil bilgileri: profile model + profile screen + settings screen
+- Çalışma programı düzenleme: study_program model/provider/service/screen
+- Akademik çalışma odası düzenleme: academic_room screen
+- Geri bildirim düzenleme: feedback screen/dialog
+- Yönetici işlemleri: admin settings + admin screens
+- Ortak görünüm değişikliği: shared/widgets
+
+6. ÖZET
+
+- Core: uygulamanın iskeleti, başlangıç ve yönlendirme
+- Features: işlevsel ekranlar ve modüller
+- Shared: tekrar kullanılan UI bileşenleri
+- Auth, Profile, Study Program, Admin, Feedback: ana iş akışlarına göre ayrılmış alanlar

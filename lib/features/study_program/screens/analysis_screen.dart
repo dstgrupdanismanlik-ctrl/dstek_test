@@ -1,9 +1,12 @@
 import 'dart:math' as math;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:dstek/features/academic_room/screens/academic_study_room_screen.dart';
+import 'package:dstek/features/exams/providers/exam_provider.dart';
 import 'package:dstek/features/study_program/models/study_subject.dart';
 import 'package:dstek/features/study_program/providers/study_program_provider.dart';
 import 'package:dstek/shared/widgets/app_drawer.dart';
@@ -22,18 +25,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
   final List<double> _assignedTasksMock = [72, 74, 79, 84, 87, 92];
   final List<double> _completedTasksMock = [60, 66, 69, 78, 80, 88];
-
-  final List<String> _risingMomentum = const [
-    'Matematik - Fonksiyonlar (+%12)',
-    'Kimya - Organik Tepkimeler (+%9)',
-    'Biyoloji - Sistemler (+%7)',
-  ];
-
-  final List<String> _fallingMomentum = const [
-    'Fizik - Vektörler (-%8)',
-    'Geometri - Çember (-%6)',
-    'Tarih - İnkilaplar (-%4)',
-  ];
 
   double _calculateUsedHours(StudyProgramProvider provider) {
     final allPlanned = [...provider.basketSubjects, ...provider.activeProgramSubjects];
@@ -71,7 +62,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               ),
               child: InkWell(
                 borderRadius: BorderRadius.circular(10),
-                onTap: () => setState(() => _selectedPeriod = period),
+                onTap: () {
+                  setState(() => _selectedPeriod = period);
+                  context.read<ExamProvider>().setTimeFilter(labels[period]!);
+                },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Text(
@@ -304,17 +298,21 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  Widget _buildProgramFitChart() {
+  Widget _buildProgramFitChart(List<double> weeklyData) {
     final assignedSpots = _assignedTasksMock
         .asMap()
         .entries
         .map((entry) => FlSpot(entry.key.toDouble() + 1, entry.value))
         .toList();
-    final completedSpots = _completedTasksMock
+    final completedSpots = weeklyData
         .asMap()
         .entries
         .map((entry) => FlSpot(entry.key.toDouble() + 1, entry.value))
         .toList();
+
+    // Max Y değerini bulup grafiğin tavanını dinamik ayarlayalım
+    final maxY = weeklyData.isEmpty ? 100.0 : weeklyData.reduce(math.max) + 50.0;
+    final double yInterval = (maxY / 5).ceilToDouble() > 0 ? (maxY / 5).ceilToDouble() : 20.0;
 
     return Card(
       elevation: 0,
@@ -325,11 +323,11 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Program Uyum İstatistiği',
+              'Haftalık Çözüm İstatistiği',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text('Verilen görev ve tamamlanan görev karşılaştırması', style: TextStyle(color: Colors.black54)),
+            const Text('Zaman içindeki soru çözüm performansı', style: TextStyle(color: Colors.black54)),
             const SizedBox(height: 14),
             SizedBox(
               height: 250,
@@ -338,11 +336,11 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   minX: 1,
                   maxX: 6,
                   minY: 0,
-                  maxY: 100,
+                  maxY: maxY,
                   lineTouchData: LineTouchData(enabled: true),
                   gridData: FlGridData(
                     show: true,
-                    horizontalInterval: 20,
+                    horizontalInterval: yInterval,
                     getDrawingHorizontalLine: (value) {
                       return FlLine(color: Colors.blueGrey.withValues(alpha: 0.12), strokeWidth: 1);
                     },
@@ -355,18 +353,22 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        interval: 20,
-                        reservedSize: 32,
+                        interval: yInterval,
+                        reservedSize: 42,
                         getTitlesWidget: (value, meta) {
-                          return Text('%${value.toInt()}', style: const TextStyle(fontSize: 11, color: Colors.black54));
+                          if (value == 0) return const SizedBox.shrink();
+                          // 1000'den büyük sayıları kısaltmak için 1K gibi gösterebiliriz
+                          final displayValue = value >= 1000 ? '${(value / 1000).toStringAsFixed(1)}k' : value.toInt().toString();
+                          return Text(displayValue, style: const TextStyle(fontSize: 11, color: Colors.black54));
                         },
                       ),
                     ),
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
+                        interval: 1,
                         getTitlesWidget: (value, meta) {
-                          if (value < 1 || value > 6) return const SizedBox.shrink();
+                          if (value < 1 || value > 6 || value % 1 != 0) return const SizedBox.shrink();
                           return Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text('${value.toInt()}. Hafta', style: const TextStyle(fontSize: 11)),
@@ -421,8 +423,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               spacing: 14,
               runSpacing: 8,
               children: const [
-                _LegendDot(color: Color(0xFF5E35B1), label: 'Verilen Görev'),
-                _LegendDot(color: Color(0xFF00897B), label: 'Tamamlanan Görev'),
+                _LegendDot(color: Color(0xFF5E35B1), label: 'Hedeflenen'),
+                _LegendDot(color: Color(0xFF00897B), label: 'Çözülen Soru'),
               ],
             ),
           ],
@@ -431,83 +433,101 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  Widget _buildMomentumRadar() {
-    Widget buildColumn({
-      required String title,
-      required String icon,
-      required List<String> items,
-      required Color accent,
-    }) {
-      return Expanded(
-        child: Container(
-          decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: accent.withValues(alpha: 0.18)),
-          ),
-          padding: const EdgeInsets.all(12),
+  Widget _buildMomentumRadar(BuildContext context, ExamProvider provider) {
+    final momentumData = provider.getMomentumData();
+
+    if (momentumData.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(20),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('$icon $title', style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              ...items.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(item, style: const TextStyle(fontSize: 13.5)),
-                ),
-              ),
+              Icon(Icons.radar, size: 40, color: Colors.grey),
+              SizedBox(height: 12),
+              Text('Momentum Radarı', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              Text('Henüz son test verileriyle röntgen arasında bir kıyaslama oluşmadı. Test çözdükçe burası canlanacak! 💖', textAlign: TextAlign.center, style: TextStyle(color: Colors.black54)),
             ],
           ),
         ),
       );
     }
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Momentum Radar',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                buildColumn(
-                  title: 'Yükselenler',
-                  icon: '🚀',
-                  items: _risingMomentum,
-                  accent: const Color(0xFF1E88E5),
-                ),
-                const SizedBox(width: 12),
-                buildColumn(
-                  title: 'Düşenler',
-                  icon: '⚠️',
-                  items: _fallingMomentum,
-                  accent: const Color(0xFFEF6C00),
-                ),
-              ],
-            ),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Icon(Icons.radar, color: Colors.deepPurple),
+              SizedBox(width: 8),
+              Text('Momentum Radarı', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+            ],
+          ),
         ),
-      ),
+        const SizedBox(height: 8),
+        ...momentumData.map((m) {
+          final isRising = m['durum'] == 'yukseliste';
+          final color = isRising ? Colors.green : Colors.red;
+          final icon = isRising ? Icons.trending_up : Icons.trending_down;
+          final diff = (m['fark'] as double).abs().toInt();
+
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              leading: CircleAvatar(
+                backgroundColor: color.withOpacity(0.1),
+                child: Icon(icon, color: color),
+              ),
+              title: Text(m['konu'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: Text('${m['ders']} • Eski: %${(m['eski'] as double).toInt()} ➔ Yeni: %${(m['yeni'] as double).toInt()}'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${isRising ? '+' : '-'}$diff',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_circle_right, color: Colors.blueAccent, size: 28),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AcademicStudyRoomScreen(
+                            initialDers: m['ders'],
+                            initialKonu: m['konu'],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<StudyProgramProvider>(
-      builder: (context, provider, _) {
+    return Consumer2<StudyProgramProvider, ExamProvider>(
+      builder: (context, provider, examProvider, _) {
         final usedHours = _calculateUsedHours(provider);
-        final weeklyBudget = provider.weeklyBudgetHours;
-        final reachedPercent =
-            weeklyBudget <= 0 ? 0.0 : ((usedHours / weeklyBudget) * 100).clamp(0.0, 100.0);
+        final formattedUsedHours = '${usedHours.toInt()}s ${((usedHours % 1) * 60).toInt()}d';
 
         final List<StudySubject> allSubjects = [
           ...provider.subjects,
@@ -532,7 +552,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               children: [
                 _buildPeriodToggle(),
                 const SizedBox(height: 16),
-                _buildGoalGauge(reachedPercent),
+                _buildGoalGauge(examProvider.filteredGenelBasari),
                 const SizedBox(height: 16),
                 SizedBox(
                   height: 140,
@@ -543,7 +563,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                           icon: Icons.timer_outlined,
                           color: const Color(0xFF5E35B1),
                           title: 'Ort. Çalışma',
-                          value: '2s 40d',
+                          value: usedHours > 0 ? formattedUsedHours : '0s 0d',
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -552,7 +572,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                           icon: Icons.task_alt,
                           color: const Color(0xFF00897B),
                           title: 'Günlük Soru',
-                          value: '145',
+                          value: examProvider.gunlukSoru.toString(),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -561,7 +581,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                           icon: Icons.stacked_line_chart,
                           color: const Color(0xFFEF6C00),
                           title: 'Toplam Soru',
-                          value: '4250',
+                          value: examProvider.filteredToplamSoru.toString(),
                         ),
                       ),
                     ],
@@ -570,12 +590,200 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 const SizedBox(height: 16),
                 _buildDominanceChart(notStartedCount, inProgressCount, completedCount),
                 const SizedBox(height: 16),
-                _buildProgramFitChart(),
-                const SizedBox(height: 16),
-                _buildMomentumRadar(),
+                _buildProgramFitChart(examProvider.altiHaftalikDagilim),
+                const SizedBox(height: 24),
+                _buildSubjectXrayList(context, examProvider),
+                const SizedBox(height: 24),
+                _buildMomentumRadar(context, examProvider),
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSubjectXrayList(BuildContext context, ExamProvider provider) {
+    String? localSelectedDers;
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('curriculum').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final docs = snapshot.data!.docs;
+        final Map<String, List<Map<String, dynamic>>> dersKonulari = {};
+
+        for (final doc in docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final ders = data['ders'] as String? ?? data['ders_adi'] as String? ?? data['lesson'] as String? ?? 'Bilinmeyen Ders';
+          dersKonulari.putIfAbsent(ders, () => []);
+          dersKonulari[ders]!.add(data);
+        }
+
+        final dersListesi = dersKonulari.keys.toList()..sort();
+        if (dersListesi.isEmpty) return const SizedBox.shrink();
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            if (localSelectedDers == null || !dersListesi.contains(localSelectedDers)) {
+              localSelectedDers = dersListesi.first;
+            }
+
+            List<Widget> konuBarlari = [];
+            for (var konuData in dersKonulari[localSelectedDers]!) {
+              final konuAdi = konuData['konu'] as String? ?? konuData['konu_adi'] as String? ?? konuData['topic'] as String? ?? 'İsimsiz Konu';
+              final konuKodu = konuData['konu_kodu'] as String? ?? '';
+              final kocNotu = konuData['koc_tavsiyesi'] as String? ?? '';
+              
+              double score = 0.0;
+              int totalQ = 0;
+              final normalizedKonu = konuAdi.toLowerCase().replaceAll(' ', '');
+              final normalizedNot = kocNotu.toLowerCase().replaceAll(' ', '');
+              
+              for (var xray in provider.xrayData) {
+                final kKodu = (xray['konu_kodu'] as String? ?? '').toLowerCase().replaceAll(' ', '');
+                if (kKodu.isNotEmpty) {
+                  if (konuKodu.toLowerCase().replaceAll(' ', '') == kKodu || 
+                      normalizedKonu.contains(kKodu) || 
+                      kKodu.contains(normalizedKonu) ||
+                      (normalizedNot.isNotEmpty && normalizedNot.contains(kKodu))) {
+                    
+                    score = ((xray['guvenilir_basari_skoru'] ?? 0.0) as num).toDouble();
+                    
+                    final optik = xray['optik_test_d_y_b'] as Map<String, dynamic>? ?? {};
+                    final manuel = xray['manuel_d_y_b'] as Map<String, dynamic>? ?? {};
+                    int tD = ((optik['D'] ?? 0) as num).toInt() + ((manuel['D'] ?? 0) as num).toInt();
+                    int tY = ((optik['Y'] ?? 0) as num).toInt() + ((manuel['Y'] ?? 0) as num).toInt();
+                    int tB = ((optik['B'] ?? 0) as num).toInt() + ((manuel['B'] ?? 0) as num).toInt();
+                    totalQ = tD + tY + tB;
+                    
+                    if (score <= 0.0 && totalQ > 0) {
+                       score = (tD / totalQ) * 100;
+                    }
+                    break;
+                  }
+                }
+              }
+              
+              final hasData = score > 0 || totalQ > 0;
+              
+              konuBarlari.add(
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(konuAdi, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: LinearProgressIndicator(
+                                      value: hasData ? score / 100 : 1.0,
+                                      minHeight: 12,
+                                      backgroundColor: Colors.grey.shade200,
+                                      color: hasData 
+                                          ? (score >= 70 ? Colors.green.shade500 : (score >= 40 ? Colors.orange.shade500 : Colors.red.shade500))
+                                          : Colors.grey.shade300,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                SizedBox(
+                                  width: 45,
+                                  child: Text(
+                                    hasData ? '%${score.toInt()}' : 'Yok', 
+                                    style: TextStyle(
+                                      fontSize: 13, 
+                                      fontWeight: FontWeight.bold,
+                                      color: hasData ? Colors.black87 : Colors.grey.shade500
+                                    )
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_circle_right, color: Colors.blueAccent, size: 30),
+                        tooltip: 'Akademik Odada Çalış',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AcademicStudyRoomScreen(
+                                initialDers: localSelectedDers,
+                                initialKonu: konuAdi,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.favorite, color: Colors.pinkAccent),
+                        SizedBox(width: 8),
+                        Text('Tüm Derslerin Başarı Röntgeni', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: localSelectedDers,
+                          items: dersListesi
+                              .map((ders) => DropdownMenuItem<String>(
+                                    value: ders,
+                                    child: Text(ders, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  ))
+                              .toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              localSelectedDers = val;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (konuBarlari.isEmpty)
+                      const Text('Bu ders için henüz yeterli röntgen verisi yok. 💖', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic))
+                    else
+                      ...konuBarlari,
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );

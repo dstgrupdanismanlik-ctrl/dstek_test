@@ -615,79 +615,174 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     }
   }
 
+  Widget _buildSyncTab() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.storage, size: 80, color: Colors.blueGrey),
+            const SizedBox(height: 24),
+            const Text(
+              'Google Sheets Veritabani Senkronizasyonu',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Bu islem, tablodaki guncel YKS ders ve konu listelerini Firestore "curriculum" koleksiyonuna aktarir.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            if (_isLoading) ...[
+              const CircularProgressIndicator(),
+              const SizedBox(height: 12),
+              Text(
+                _activeTableLabel.isEmpty
+                    ? 'Veri yukleniyor...'
+                    : 'Yukleniyor: $_activeTableLabel',
+                textAlign: TextAlign.center,
+              ),
+            ] else ...[
+              ElevatedButton.icon(
+                onPressed: _isDeleting ? null : _showTableSelectionDialog,
+                icon: const Icon(Icons.cloud_sync),
+                label: const Text('SISTEMI KUR (EXCEL GUNCELLE)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: _isDeleting ? null : _clearDatabase,
+                icon: _isDeleting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.delete_forever),
+                label: const Text('VERITABANINI TEMIZLE'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade900,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDynamicCrudTab(String collectionName) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection(collectionName).snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Hata: ${snapshot.error}'));
+        }
+        final docs = snapshot.data?.docs ?? [];
+        if (docs.isEmpty) {
+          return const Center(child: Text('Kayıt bulunamadı.'));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final doc = docs[index];
+            final data = doc.data() as Map<String, dynamic>;
+            
+            // Tablodaki olası kimlik alanlarını bul
+            final title = data['id'] ?? data['kod'] ?? data['tanim_kodu'] ?? data['sabit_kodu'] ?? doc.id;
+            
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ExpansionTile(
+                title: Text(title.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('ID: ${doc.id}'),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(data.toString()), 
+                  ),
+                  ButtonBar(
+                    children: [
+                      TextButton.icon(
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Silme Onayı'),
+                              content: const Text('Bu kaydı silmek istediğinize emin misiniz?'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Vazgeç')),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, true), 
+                                  style: TextButton.styleFrom(foregroundColor: Colors.red), 
+                                  child: const Text('Sil')
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            await _firestore.collection(collectionName).doc(doc.id).delete();
+                          }
+                        },
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        label: const Text('Sil', style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  )
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Sistem Kurulumu (Admin)')),
-      drawer: const AppDrawer(),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.storage, size: 80, color: Colors.blueGrey),
-              const SizedBox(height: 24),
-              const Text(
-                'Google Sheets Veritabani Senkronizasyonu',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Bu islem, tablodaki guncel YKS ders ve konu listelerini Firestore "curriculum" koleksiyonuna aktarir.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              if (_isLoading) ...[
-                const CircularProgressIndicator(),
-                const SizedBox(height: 12),
-                Text(
-                  _activeTableLabel.isEmpty
-                      ? 'Veri yukleniyor...'
-                      : 'Yukleniyor: $_activeTableLabel',
-                  textAlign: TextAlign.center,
-                ),
-              ] else ...[
-                ElevatedButton.icon(
-                  onPressed: _isDeleting ? null : _showTableSelectionDialog,
-                  icon: const Icon(Icons.cloud_sync),
-                  label: const Text('SISTEMI KUR (EXCEL GUNCELLE)'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  onPressed: _isDeleting ? null : _clearDatabase,
-                  icon: _isDeleting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.delete_forever),
-                  label: const Text('VERITABANINI TEMIZLE'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.shade900,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                  ),
-                ),
-              ],
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Sistem Kurulumu (Admin)'),
+          bottom: const TabBar(
+            isScrollable: true,
+            tabs: [
+              Tab(icon: Icon(Icons.sync), text: 'Veritabanı Senkronizasyonu'),
+              Tab(icon: Icon(Icons.settings_applications), text: 'Sistem Sabitleri'),
+              Tab(icon: Icon(Icons.list_alt), text: 'Genel Tanımlar'),
             ],
           ),
+        ),
+        drawer: const AppDrawer(),
+        body: TabBarView(
+          children: [
+            _buildSyncTab(),
+            _buildDynamicCrudTab('system_constants'),
+            _buildDynamicCrudTab('general_definitions'),
+          ],
         ),
       ),
     );

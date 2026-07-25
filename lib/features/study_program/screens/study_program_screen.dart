@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:dstek/features/academic_room/screens/academic_study_room_screen.dart';
 import 'package:dstek/features/study_program/models/study_subject.dart';
 import 'package:dstek/features/study_program/providers/study_program_provider.dart';
 import 'package:dstek/shared/widgets/app_drawer.dart';
@@ -845,50 +846,118 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
     bool isSaved = provider.isProgramSaved;
     final isCompletedForDay = task.completedDays.contains(dayIndex);
 
-    return Card(
+    Widget card = Card(
       elevation: isCompact ? 1 : 2,
       color: isCompletedForDay ? Colors.green.shade50 : Colors.white,
       margin: EdgeInsets.only(bottom: isCompact ? 6 : 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        children: [
-          ListTile(
-            contentPadding: EdgeInsets.symmetric(horizontal: isCompact ? 4 : 16, vertical: 0),
-            leading: Checkbox(
-              value: isCompletedForDay,
-              activeColor: Colors.green,
-              onChanged: (_) => provider.toggleSubjectCompletion(task, dayIndex),
-            ),
-            title: Text(
-              task.name, 
-              style: TextStyle(fontSize: isCompact ? 11 : 14, fontWeight: FontWeight.bold, decoration: isCompletedForDay ? TextDecoration.lineThrough : null),
-              maxLines: isCompact ? 2 : null, overflow: isCompact ? TextOverflow.ellipsis : null,
-            ),
-            subtitle: Column(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: isCompact ? 8 : 16, vertical: isCompact ? 8 : 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (!isCompact)
-                  Text('Durum: ${task.effectiveScore.toStringAsFixed(0)} puan'),
-                SizedBox(height: isCompact ? 2 : 4),
-                _buildTaskTagChip(task.columnId),
+                Checkbox(
+                  value: isCompletedForDay,
+                  activeColor: Colors.green,
+                  onChanged: (_) => provider.toggleSubjectCompletion(task, dayIndex),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      task.name,
+                      style: TextStyle(
+                        fontSize: isCompact ? 11 : 14,
+                        fontWeight: FontWeight.bold,
+                        decoration: isCompletedForDay ? TextDecoration.lineThrough : null,
+                      ),
+                      maxLines: isCompact ? 2 : null,
+                      overflow: isCompact ? TextOverflow.ellipsis : null,
+                    ),
+                  ),
+                ),
+                if (!isSaved)
+                  IconButton(
+                    icon: Icon(Icons.delete, color: Colors.red, size: isCompact ? 16 : 24),
+                    onPressed: () => provider.removeSubjectFromDay(task, dayIndex),
+                  ),
               ],
             ),
-            trailing: isSaved ? null : IconButton(
-              icon: Icon(Icons.delete, color: Colors.red, size: isCompact ? 16 : 24),
-              onPressed: () => provider.removeFromProgram(task),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (!isCompact)
+                  Expanded(
+                    child: Text(
+                      'Durum: ${task.effectiveScore.toStringAsFixed(0)} puan',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    ),
+                  )
+                else
+                  Expanded(child: _buildTaskTagChip(task.columnId)),
+                if (isCompact)
+                  const SizedBox(width: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!isCompact)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: _buildTaskTagChip(task.columnId),
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.arrow_circle_right, color: Colors.blueAccent, size: 24),
+                      tooltip: 'Akademik Odada Çalış',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AcademicStudyRoomScreen(
+                              initialDers: task.courseName.isNotEmpty ? task.courseName : null,
+                              initialKonu: task.name,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ),
-          if (!isCompact) ...[
-            const Divider(height: 1),
-            Container(
-              padding: const EdgeInsets.all(12),
-              width: double.infinity,
-              decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12))),
-              child: Text('Koçun Notu: ${task.opticalSuccess < 70 ? 'Temel kavramları tekrar et.' : 'Eksik kazanımlara odaklan.'}'),
-            ),
-          ]
-        ],
+            if (!isCompact) ...[
+              const SizedBox(height: 10),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                width: double.infinity,
+                decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: const BorderRadius.all(Radius.circular(10))),
+                child: Text('Koçun Notu: ${task.opticalSuccess < 70 ? 'Temel kavramları tekrar et.' : 'Eksik kazanımlara odaklan.'}'),
+              ),
+            ]
+          ],
+        ),
       ),
+    );
+
+    if (isSaved) return card;
+
+    // Sürüklenebilir Kart Zırhı (Web uyumlu standart Draggable)
+    return Draggable<String>(
+      data: '${task.id}|$dayIndex',
+      feedback: Material(
+        elevation: 6,
+        color: Colors.transparent,
+        child: SizedBox(
+          width: 200,
+          child: Opacity(opacity: 0.9, child: card),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.3, child: card),
+      child: card,
     );
   }
 
@@ -913,40 +982,89 @@ class _StudyProgramScreenState extends State<StudyProgramScreen> with SingleTick
             final dayTasks = provider.activeProgramSubjects.where((item) => item.assignedDays.contains(dayIndex)).toList();
 
             return Expanded(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Column(
-                  children: [
-                    // Gün Başlığı
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: loopDay.day == DateTime.now().day ? Colors.blueAccent : Colors.blueGrey.shade100,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(weekDaysTr[dayIndex], style: TextStyle(fontWeight: FontWeight.bold, color: loopDay.day == DateTime.now().day ? Colors.white : Colors.black87)),
-                          Text(_formatDate(loopDay), style: TextStyle(fontSize: 12, color: loopDay.day == DateTime.now().day ? Colors.white70 : Colors.black54)),
-                        ],
-                      ),
+              child: DragTarget<String>(
+                onWillAcceptWithDetails: (details) => !provider.isProgramSaved,
+                onAcceptWithDetails: (details) async {
+                  final parts = details.data.split('|');
+                  if (parts.length == 2) {
+                    final subjectId = parts[0];
+                    final oldDayIndex = int.parse(parts[1]);
+
+                    // Aynı güne bırakılırsa işlemi pas geç
+                    if (oldDayIndex == dayIndex) return;
+
+                    final subject = provider.activeProgramSubjects.firstWhere(
+                      (s) => s.id == subjectId,
+                      orElse: () => provider.allSubjects.firstWhere((s) => s.id == subjectId)
+                    );
+
+                    // BAŞ MİMAR KURALI: Ön Koşul Kontrolü ve Öğrenci İnisiyatifi
+                    final conflictPre = provider.getConflictingPrerequisiteForMove(subject, dayIndex);
+
+                    if (conflictPre != null) {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('⚠️ Pedagojik Uyarı', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                          content: Text(
+                            'Bu konuyu buraya taşırsan, ön koşulu olan "${conflictPre.name}" konusunu tam öğrenmeden buna geçmiş olursun. Bu durum konuyu anlamanda sorun yaratabilir.\n\nYine de taşımak istiyor musun?'
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Vazgeç'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
+                              child: const Text('Yine de Taşı'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm != true) return;
+                    }
+
+                    provider.moveSubjectDay(subject, oldDayIndex, dayIndex);
+                  }
+                },
+                builder: (context, candidateData, rejectedData) {
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: candidateData.isNotEmpty ? Colors.blue.shade50 : Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
                     ),
-                    // Görev Listesi
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(4),
-                        itemCount: dayTasks.length,
-                        itemBuilder: (context, taskIndex) => _buildDailyTaskCard(dayTasks[taskIndex], dayIndex),
-                      ),
+                    child: Column(
+                      children: [
+                        // Gün Başlığı
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: loopDay.day == DateTime.now().day ? Colors.blueAccent : Colors.blueGrey.shade100,
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(weekDaysTr[dayIndex], style: TextStyle(fontWeight: FontWeight.bold, color: loopDay.day == DateTime.now().day ? Colors.white : Colors.black87)),
+                              Text(_formatDate(loopDay), style: TextStyle(fontSize: 12, color: loopDay.day == DateTime.now().day ? Colors.white70 : Colors.black54)),
+                            ],
+                          ),
+                        ),
+                        // Görev Listesi
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(4),
+                            itemCount: dayTasks.length,
+                            itemBuilder: (context, taskIndex) => _buildDailyTaskCard(dayTasks[taskIndex], dayIndex),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             );
           }).toList(),

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart'; // Provider paketini içe aktardık
 import 'firebase_options.dart';
 import 'core/routing/app_router.dart';
 import 'features/auth/providers/auth_provider.dart'; // Yazdığımız sınıf
+import 'features/exams/providers/exam_provider.dart';
 import 'package:dstek/features/study_program/providers/study_program_provider.dart';
 
 void main() async {
@@ -18,6 +19,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => ExamProvider()),
         // YENİ EKLENEN SATIR: Çalışma Programı zeka merkezini sisteme tanıttık
         ChangeNotifierProvider(create: (_) => StudyProgramProvider()), 
       ],

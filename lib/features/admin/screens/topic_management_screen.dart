@@ -85,10 +85,10 @@ class _TopicManagementScreenState extends State<TopicManagementScreen> {
         ? 'MASTER'
         : _resolveInstitutionCode(authProvider.currentUserData);
 
-    final calismaSuresiDk = int.tryParse(_calismaSuresiController.text.trim());
+    final calismaSuresiSaat = int.tryParse(_calismaSuresiController.text.trim());
     final yayilimGun = int.tryParse(_yayilimGunController.text.trim());
 
-    if (calismaSuresiDk == null || yayilimGun == null) {
+    if (calismaSuresiSaat == null || yayilimGun == null) {
       _showSnackBar('Süre ve gün alanlarına sayısal değer girin.', Colors.red);
       return;
     }
@@ -103,7 +103,7 @@ class _TopicManagementScreenState extends State<TopicManagementScreen> {
         'sinavTuru': _selectedSinavTuru,
         'dersAdi': _dersAdiController.text.trim(),
         'konuAdi': _konuAdiController.text.trim(),
-        'calismaSuresiDk': calismaSuresiDk,
+        'calismaSuresiSaat': calismaSuresiSaat,
         'yayilimGun': yayilimGun,
         'onKosulKodu': _onKosulKoduController.text.trim(),
         'isActive': true,

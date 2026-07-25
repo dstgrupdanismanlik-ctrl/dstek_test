@@ -24,6 +24,8 @@ class StudyProgramProvider extends ChangeNotifier {
   final Map<String, String> _subjectCodeById = {};
   final Map<String, List<String>> _prerequisiteCodesBySubjectCode = {};
   final Map<String, double> _xrayScoresByCode = {};
+  // Sadece ön koşul olarak eklenen konuların ID'lerini tutar (Ana konu ayrıcalığı için)
+  final Set<String> _prerequisiteOnlyIds = {};
   List<bool> holidayPreferences = [false, false, false, false, false, false, true];
 
   final List<String> _columnOrder = [
@@ -390,9 +392,22 @@ class StudyProgramProvider extends ChangeNotifier {
   }
 
   bool addSubjectToBasket(StudySubject subject) {
-    if (!_subjects.contains(subject)) return false;
+    final trueSubject = _subjects.cast<StudySubject?>().firstWhere(
+      (s) => s?.id == subject.id,
+      orElse: () => null,
+    );
 
-    return _addSubjectsToBasketInternal([subject]);
+    if (trueSubject == null) {
+      if (_basketSubjects.any((s) => s.id == subject.id) ||
+          _activeProgramSubjects.any((s) => s.id == subject.id)) {
+        _prerequisiteOnlyIds.remove(subject.id);
+        notifyListeners();
+      }
+      return false;
+    }
+
+    _prerequisiteOnlyIds.remove(trueSubject.id);
+    return _addSubjectsToBasketInternal([trueSubject]);
   }
 
   // TODO: Bu veri ileride system_constants'tan veya öğrenci profilinden çekilecek. Şimdilik test için 150 gün veriyoruz.
@@ -419,18 +434,44 @@ class StudyProgramProvider extends ChangeNotifier {
     StudySubject subject,
     List<StudySubject> selectedPrerequisites,
   ) {
-    if (!_subjects.contains(subject)) {
-      return false;
+    _prerequisiteOnlyIds.remove(subject.id);
+
+    final prerequisitesToAdd = <StudySubject>[];
+
+    for (var pre in selectedPrerequisites) {
+      if (pre.id == subject.id) continue;
+
+      if (_basketSubjects.any((s) => s.id == pre.id) ||
+          _activeProgramSubjects.any((s) => s.id == pre.id)) {
+        continue;
+      }
+
+      final truePre = _subjects.cast<StudySubject?>().firstWhere(
+        (s) => s?.id == pre.id,
+        orElse: () => null,
+      );
+      if (truePre != null) {
+        prerequisitesToAdd.add(truePre);
+        _prerequisiteOnlyIds.add(truePre.id);
+      }
     }
 
-    final prerequisitesToAdd = selectedPrerequisites
-        .where((item) => item.id != subject.id && _subjects.contains(item))
-        .toList()
-      ..sort((a, b) => a.programOrder.compareTo(b.programOrder));
+    final warningMsg = '📌 Ön koşul zinciri takvime sığmıyor. 2. sıradaki konuyu sonraki haftaya bırakabilir veya takvimden ilk konunun gün sayısını manuel azaltarak yer açabilirsin.';
+    prerequisitesToAdd.sort((a, b) => a.programOrder.compareTo(b.programOrder));
+
+    final trueSubject = _subjects.cast<StudySubject?>().firstWhere(
+      (s) => s?.id == subject.id,
+      orElse: () => null,
+    );
+
+    if (trueSubject == null) {
+      if (prerequisitesToAdd.isEmpty) return false;
+      return _addSubjectsToBasketInternal(prerequisitesToAdd);
+    }
 
     return _addSubjectsToBasketInternal([
       ...prerequisitesToAdd,
-      subject,
+      trueSubject,
     ]);
   }
 
@@ -445,6 +486,7 @@ class StudyProgramProvider extends ChangeNotifier {
 
   void removeFromBasket(StudySubject subject) {
     _basketSubjects.remove(subject);
+    _prerequisiteOnlyIds.remove(subject.id);
     _subjects.add(subject);
     _remainingHours += getEffectiveDuration(subject, subject.columnId);
     _isOverBudget = false;
@@ -453,6 +495,7 @@ class StudyProgramProvider extends ChangeNotifier {
 
   void removeFromProgram(StudySubject item) {
     _activeProgramSubjects.remove(item);
+    _prerequisiteOnlyIds.remove(item.id);
     final resetItem = item.copyWith(completedDays: const []);
     resetItem.assignedDays = [];
     _subjects.add(resetItem); 
@@ -468,6 +511,61 @@ class StudyProgramProvider extends ChangeNotifier {
   void changeSubjectDay(StudySubject item, int newDayIndex) {
     item.assignedDays = [newDayIndex];
     notifyListeners();
+  }
+
+  // 1. Sadece İlgili Günü Silme (Multi-Day Delete)
+  void removeSubjectFromDay(StudySubject subject, int dayIndex) {
+    final index = _activeProgramSubjects.indexWhere((s) => s.id == subject.id);
+    if (index != -1) {
+      final updatedDays = List<int>.from(_activeProgramSubjects[index].assignedDays);
+      updatedDays.remove(dayIndex);
+
+      if (updatedDays.isEmpty) {
+        removeFromProgram(subject);
+      } else {
+        _activeProgramSubjects[index].assignedDays = updatedDays;
+        final double partialHour = getEffectiveDuration(subject, subject.columnId) / subject.recommendedDays;
+        _remainingHours += partialHour;
+        _isOverBudget = _remainingHours < 0;
+        notifyListeners();
+      }
+    }
+  }
+
+  // 2. Konunun İlgili Gününü Taşıma (Drag & Drop Move)
+  void moveSubjectDay(StudySubject subject, int oldDayIndex, int newDayIndex) {
+    final index = _activeProgramSubjects.indexWhere((s) => s.id == subject.id);
+    if (index != -1) {
+      final updatedDays = List<int>.from(_activeProgramSubjects[index].assignedDays);
+      updatedDays.remove(oldDayIndex);
+      if (!updatedDays.contains(newDayIndex)) {
+        updatedDays.add(newDayIndex);
+        updatedDays.sort();
+      }
+      _activeProgramSubjects[index].assignedDays = updatedDays;
+      notifyListeners();
+    }
+  }
+
+  // BAŞ MİMAR KURALI: Taşıma işleminde ön koşul çakışmasını tespit et
+  StudySubject? getConflictingPrerequisiteForMove(StudySubject subject, int newDayIndex) {
+    final prereqCodes = [
+      ..._extractPrerequisiteCodesFromText(subject.inCoursePrerequisite),
+      ..._extractPrerequisiteCodesFromText(subject.outOfCoursePrerequisite)
+    ];
+
+    for (var p in _activeProgramSubjects) {
+      if (prereqCodes.any((code) => p.name.startsWith('$code ') || p.name.startsWith('$code-'))) {
+        if (p.assignedDays.isNotEmpty) {
+          // Eğer ön koşulun son çalışıldığı gün, yeni taşınmak istenen günden BÜYÜK veya EŞİTSE pedagojik çakışma vardır.
+          int pLastDay = p.assignedDays.last;
+          if (pLastDay >= newDayIndex) {
+            return p;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   void toggleSubjectCompletion(StudySubject subject, int dayIndex) {
@@ -492,27 +590,99 @@ class StudyProgramProvider extends ChangeNotifier {
   void distributeProgram(List<int> activeDays) {
     if (activeDays.isEmpty) return;
 
-    // Hem eski programı hem sepettekileri birleştirip yepyeni bir dağıtım yapıyoruz
     final allToDistribute = [..._activeProgramSubjects, ..._basketSubjects];
+    // Program sırasına göre pedagojik dizilim
+    allToDistribute.sort((a, b) => a.programOrder.compareTo(b.programOrder));
 
-    int dayPointer = 0;
+    List<StudySubject> distributed = [];
+    List<StudySubject> leftInBasket = [];
+    
+    // Her aktif günün üzerindeki saat yükünü takip eden hafıza
+    List<double> dailyHours = List.filled(activeDays.length, 0.0);
+
     for (var subject in allToDistribute) {
       subject.assignedDays = [];
-      int daysNeeded = subject.recommendedDays;
-      if (daysNeeded > activeDays.length) daysNeeded = activeDays.length;
+      
+      double originalDuration = subject.estimatedStudyHours.toDouble();
+      double effectiveDuration = getEffectiveDuration(subject, subject.columnId);
+      int originalDays = subject.recommendedDays;
+      int daysNeeded = originalDays;
+
+      // Evrensel Amortisman Kuralı
+      if (effectiveDuration < originalDuration && originalDuration > 0) {
+        double ratio = effectiveDuration / originalDuration;
+        daysNeeded = (originalDays * ratio).round();
+      }
       if (daysNeeded < 1) daysNeeded = 1;
 
-      for (int i = 0; i < daysNeeded; i++) {
-        subject.assignedDays.add(activeDays[(dayPointer + i) % activeDays.length]);
+      int earliestAllowedDay = 0;
+
+      // 1. BAŞ MİMAR KURALI: Ön Koşul Kontrolü (Zincirleme)
+      final prereqCodes = [
+        ..._extractPrerequisiteCodesFromText(subject.inCoursePrerequisite),
+        ..._extractPrerequisiteCodesFromText(subject.outOfCoursePrerequisite)
+      ];
+      
+      for (var d in distributed) {
+        if (prereqCodes.any((code) => d.name.startsWith('$code ') || d.name.startsWith('$code-'))) {
+          if (d.assignedDays.isNotEmpty) {
+            int lastAssignedIndex = activeDays.indexOf(d.assignedDays.last);
+            if (lastAssignedIndex + 1 > earliestAllowedDay) {
+              earliestAllowedDay = lastAssignedIndex + 1;
+            }
+          }
+        }
       }
-      dayPointer = (dayPointer + daysNeeded) % activeDays.length;
+
+      // 2. BAŞ MİMAR KURALI: Dengeli Dağıtım (Min-Load Algorithm)
+      // Konuyu takvimdeki "en az yükü olan" uygun günlere yerleştir ki yığılma olmasın
+      int bestStartDay = -1;
+      double minMaxLoad = 9999.0;
+      double dailyLoad = effectiveDuration / daysNeeded;
+
+      for (int start = earliestAllowedDay; start <= activeDays.length - daysNeeded; start++) {
+        double currentMaxLoad = 0.0;
+        for (int i = 0; i < daysNeeded; i++) {
+          double load = dailyHours[start + i] + dailyLoad;
+          if (load > currentMaxLoad) currentMaxLoad = load;
+        }
+        // Eğer bu gün aralığı 12 saatlik mutlak sınırı aşmıyorsa ve şu ana kadarki en boş yerse
+        if (currentMaxLoad <= 12.0 && currentMaxLoad < minMaxLoad) {
+          minMaxLoad = currentMaxLoad;
+          bestStartDay = start;
+        }
+      }
+
+      // 3. BAŞ MİMAR KURALI: Takvime sığıyor mu? (Haftalık sınır kontrolü)
+      if (bestStartDay != -1) {
+        for (int i = 0; i < daysNeeded; i++) {
+          int dayToAssign = bestStartDay + i;
+          subject.assignedDays.add(activeDays[dayToAssign]);
+          dailyHours[dayToAssign] += dailyLoad; // O günün yükünü artır
+        }
+        distributed.add(subject);
+      } else {
+        leftInBasket.add(subject); // Sığmadıysa haftaya bırak (Sepet)
+      }
     }
 
     _activeProgramSubjects.clear();
-    _activeProgramSubjects.addAll(allToDistribute);
+    _activeProgramSubjects.addAll(distributed);
     _basketSubjects.clear();
+    _basketSubjects.addAll(leftInBasket);
 
-    _hasActiveProgram = true;
+    _hasActiveProgram = _activeProgramSubjects.isNotEmpty;
+    
+    // Eski taşma uyarılarını temizle
+    notificationMessages.removeWhere((msg) => msg.contains('Takvim doldu') || msg.contains('sığmayan'));
+    
+    if (leftInBasket.isNotEmpty) {
+      final String overflowNames = leftInBasket.map((s) => s.name.split('-').last.trim()).join(', ');
+      notificationMessages.add('📌 Takvim doldu! Günlük kapasiteye veya ön koşul sırasına sığmayan şu konular sonraki haftaya (sepete) bırakıldı: $overflowNames');
+    } else {
+      _lastMessage = 'Program başarıyla günlere dağıtıldı.';
+    }
+    
     notifyListeners();
   }
 
@@ -525,8 +695,9 @@ class StudyProgramProvider extends ChangeNotifier {
 
   void setActiveDayCount(int value) {
     _activeDayCount = value.clamp(4, 7);
-    _remainingHours = _calculateWeeklyBudgetHours(_activeDayCount);
-    _isOverBudget = false;
+    final double usedHours = _calculateEffectiveHoursFor([..._basketSubjects, ..._activeProgramSubjects]);
+    _remainingHours = _calculateWeeklyBudgetHours(_activeDayCount) - usedHours;
+    _isOverBudget = _remainingHours < 0;
     notifyListeners();
   }
 }
